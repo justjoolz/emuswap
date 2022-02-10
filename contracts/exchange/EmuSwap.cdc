@@ -17,7 +17,7 @@ pub contract EmuSwap: FungibleTokens {
   access(contract) var poolsByID: @{UInt64: Pool}
   
   // Total supply of liquidity tokens in existence
-  pub var totalSupplyByID: {UInt64: UFix64}
+  access(contract) var totalSupplyByID: {UInt64: UFix64}
 
   //  unique ID for each pool
   pub var nextPoolID: UInt64
@@ -33,10 +33,10 @@ pub contract EmuSwap: FungibleTokens {
 
   pub let AdminStoragePath: StoragePath
 
-  // Event that is emitted when the contract is created
+  // Event that is emitted when the contract is deployed
   pub event ContractInitialized()
   
-  // Event emitted when a new LP token is created
+  // Event emitted when a new LP token is initalized
   pub event TokensInitialized(tokenID: UInt64)
 
   // Event that is emitted when tokens are withdrawn from a Vault
@@ -56,33 +56,16 @@ pub contract EmuSwap: FungibleTokens {
   // Event that is emitted when trading fee is updated
   pub event FeeUpdated(feePercentage: UFix64)
 
-
-  // Event that is emitted when a swap happens
-  // Side 1: from token1 to token2
-  // Side 2: from token2 to token1
-
   // j00lz can make this event more specific from: and to: with amounts and Type.identifier or maybe poolID
   pub event Trade(token1Amount: UFix64, token2Amount: UFix64, side: UInt8)
-
   
-  //
+  // j00lz add Pool creation details (how is this different from new LP token creation?)
   pub event NewSwapPoolCreated()
 
-
-
-  // Vault
+  // TokenVault
   //
-  // Each user stores an instance of only the Vault in their storage
-  // The functions in the Vault and governed by the pre and post conditions
-  // in FungibleTokens when they are called.
-  // The checks happen at runtime whenever a function is called.
-  //
-  // Resources can only be created in the context of the contract that they
-  // are defined in, so there is no way for a malicious user to create Vaults
-  // out of thin air. A special Minter resource needs to be defined to mint
-  // new tokens.
-  //
-  pub resource Vault: FungibleTokens.Provider, FungibleTokens.Receiver, FungibleTokens.Balance {
+  // The LP Tokens issued are stored in a TokenVault
+  pub resource TokenVault: FungibleTokens.Provider, FungibleTokens.Receiver, FungibleTokens.Balance {
 
     // holds the balance of a users tokens
     pub var balance: UFix64
@@ -96,28 +79,16 @@ pub contract EmuSwap: FungibleTokens {
 
     // withdraw
     //
-    // Function that takes an integer amount as an argument
-    // and withdraws that amount from the Vault.
-    // It creates a new temporary Vault that is used to hold
-    // the money that is being transferred. It returns the newly
-    // created Vault to the context that called so it can be deposited
-    // elsewhere.
-    //
-    pub fun withdraw(amount: UFix64): @FungibleTokens.Vault {
+    pub fun withdraw(amount: UFix64): @FungibleTokens.TokenVault {
       self.balance = self.balance - amount
       emit TokensWithdrawn(tokenID: self.tokenID, amount: amount, from: self.owner?.address)
-      return <- create Vault(tokenID: self.tokenID, balance: amount)
+      return <- create TokenVault(tokenID: self.tokenID, balance: amount)
     }
 
     // deposit
     //
-    // Function that takes a Vault object as an argument and adds
-    // its balance to the balance of the owners Vault.
-    // It is allowed to destroy the sent Vault because the Vault
-    // was a temporary holder of the tokens. The Vault's balance has
-    // been consumed and therefore can be destroyed.
-    pub fun deposit(from: @FungibleTokens.Vault) {
-      let vault <- from as! @EmuSwap.Vault
+    pub fun deposit(from: @FungibleTokens.TokenVault) {
+      let vault <- from as! @EmuSwap.TokenVault
       self.balance = self.balance + vault.balance
       emit TokensDeposited(tokenID: self.tokenID, amount: vault.balance, to: self.owner?.address)
       vault.balance = 0.0
@@ -129,15 +100,10 @@ pub contract EmuSwap: FungibleTokens {
     }
   }
 
-  // createEmptyVault
+  // createEmptyTokenVault
   //
-  // Function that creates a new Vault with a balance of zero
-  // and returns it to the calling context. A user must call this function
-  // and store the returned Vault in their storage in order to allow their
-  // account to be able to receive deposits of this token type.
-  //
-  pub fun createEmptyVault(tokenID: UInt64): @EmuSwap.Vault {
-    return <-create Vault(tokenID: tokenID, balance: 0.0)
+  pub fun createEmptyTokenVault(tokenID: UInt64): @EmuSwap.TokenVault {
+    return <-create TokenVault(tokenID: tokenID, balance: 0.0)
   }
 
   pub resource TokenBundle {
@@ -183,7 +149,7 @@ pub contract EmuSwap: FungibleTokens {
   // Function that mints new tokens, adds them to the total supply,
   // and returns them to the calling context.
   //
-  access(contract) fun mintTokens(tokenID: UInt64, amount: UFix64): @EmuSwap.Vault {
+  access(contract) fun mintTokens(tokenID: UInt64, amount: UFix64): @EmuSwap.TokenVault {
     pre {
       amount > UFix64(0): "Amount minted must be greater than zero"
     }
@@ -193,7 +159,7 @@ pub contract EmuSwap: FungibleTokens {
       EmuSwap.totalSupplyByID[tokenID] = EmuSwap.totalSupplyByID[tokenID]! + amount
     }
     emit TokensMinted(tokenID: tokenID, amount: amount)
-    return <-create Vault(tokenID: tokenID, balance: amount)
+    return <-create TokenVault(tokenID: tokenID, balance: amount)
   }
 
   // burnTokens
@@ -203,8 +169,8 @@ pub contract EmuSwap: FungibleTokens {
   // Note: the burned tokens are automatically subtracted from the 
   // total supply in the Vault destructor.
   //
-  access(contract) fun burnTokens(from: @EmuSwap.Vault) {
-    let vault <- from as! @EmuSwap.Vault
+  access(contract) fun burnTokens(from: @EmuSwap.TokenVault) {
+    let vault <- from as! @EmuSwap.TokenVault
     let amount = vault.balance
     let tokenID = vault.tokenID
     destroy vault
@@ -212,17 +178,13 @@ pub contract EmuSwap: FungibleTokens {
   }
 
   pub resource Admin {
-    pub fun freezePool(id: UInt64) {
+
+    pub fun togglePoolFreeze(id: UInt64) {
       let poolRef = &EmuSwap.poolsByID[id] as &Pool
-      poolRef.freezePool()
+      poolRef.togglePoolFreeze()
     }
 
-    pub fun unfreezePool(id: UInt64) {
-      let poolRef = &EmuSwap.poolsByID[id] as &Pool
-      poolRef.unfreezePool()
-    }
-
-    pub fun createNewLiquidityPool(from: @EmuSwap.TokenBundle): @EmuSwap.Vault {
+    pub fun createNewLiquidityPool(from: @EmuSwap.TokenBundle): @EmuSwap.TokenVault {
       /*
         let token1Vault <- from.withdrawToken1()
         let token2Vault <- from.withdrawToken2()
@@ -264,20 +226,15 @@ pub contract EmuSwap: FungibleTokens {
       // Add new Pool to dictionary
       EmuSwap.poolsByID[EmuSwap.nextPoolID] <-! newPool
 
-      log(EmuSwap.poolsByID[EmuSwap.nextPoolID]?.getPoolAmounts())
+      log(EmuSwap.poolsByID[EmuSwap.nextPoolID]?.getPoolMeta())
 
       // Create initial tokens
       let lpTokens <- EmuSwap.mintTokens(tokenID: EmuSwap.nextPoolID, amount: 1.0)
 
-      /*
-      // Set inital LP Token supply
-      EmuSwap.totalSupplyByID[EmuSwap.nextPoolID] = 1.0
-       */
-
       // increment ready for next new pool
       EmuSwap.nextPoolID = EmuSwap.nextPoolID + 1
       
-
+      // j00lz add details to event
       emit NewSwapPoolCreated()
 
       return <- lpTokens
@@ -285,14 +242,20 @@ pub contract EmuSwap: FungibleTokens {
   
   }
 
-  // Update this to PoolsMeta and include details of the token pair
-  pub struct PoolAmounts {
+  // PoolMeta
+  //
+  pub struct PoolMeta {
     pub let token1Amount: UFix64
     pub let token2Amount: UFix64
 
-    init(token1Amount: UFix64, token2Amount: UFix64) {
-      self.token1Amount = token1Amount
-      self.token2Amount = token2Amount
+    pub let token1Identifier: String
+    pub let token2Identifier: String
+
+    init(poolRef: &Pool) {
+      self.token1Amount = poolRef.token1Vault?.balance!
+      self.token2Amount = poolRef.token2Vault?.balance!
+      self.token1Identifier = poolRef.token1Vault.getType().identifier
+      self.token2Identifier = poolRef.token2Vault.getType().identifier
     }
   }
 
@@ -322,53 +285,54 @@ pub contract EmuSwap: FungibleTokens {
     }
 
     // Check current pool amounts
-    pub fun getPoolAmounts(): PoolAmounts {
+    pub fun getPoolMeta(): PoolMeta {
       pre {
         self.token1Vault != nil && self.token2Vault != nil : "Pools are not initalized!"
       }
-      return PoolAmounts(token1Amount: self.token1Vault?.balance!, token2Amount: self.token2Vault?.balance!)
+      // return PoolMeta(token1Amount: self.token1Vault?.balance!, token2Amount: self.token2Vault?.balance!)
+      return PoolMeta(poolRef: &self as &Pool)
     }
 
     // Get quote for Token1 (given) -> Token2
     pub fun quoteSwapExactToken1ForToken2(amount: UFix64): UFix64 {
-      let poolAmounts = self.getPoolAmounts()
+      let PoolMeta = self.getPoolMeta()
 
       // token1Amount * token2Amount = token1Amount' * token2Amount' = (token1Amount + amount) * (token2Amount - quote)
-      let quote = poolAmounts.token2Amount * amount / (poolAmounts.token1Amount + amount);
+      let quote = PoolMeta.token2Amount * amount / (PoolMeta.token1Amount + amount);
 
       return quote
     }
 
     // Get quote for Token1 -> Token2 (given)
     pub fun quoteSwapToken1ForExactToken2(amount: UFix64): UFix64 {
-      let poolAmounts = self.getPoolAmounts()
+      let PoolMeta = self.getPoolMeta()
 
-      assert(poolAmounts.token2Amount > amount, message: "Not enough Token2 in the pool")
+      assert(PoolMeta.token2Amount > amount, message: "Not enough Token2 in the pool")
 
       // token1Amount * token2Amount = token1Amount' * token2Amount' = (token1Amount + quote) * (token2Amount - amount)
-      let quote = poolAmounts.token1Amount * amount / (poolAmounts.token2Amount - amount);
+      let quote = PoolMeta.token1Amount * amount / (PoolMeta.token2Amount - amount);
 
       return quote
     }
 
     // Get quote for Token2 (given) -> Token1
     pub fun quoteSwapExactToken2ForToken1(amount: UFix64): UFix64 {
-      let poolAmounts = self.getPoolAmounts()
+      let PoolMeta = self.getPoolMeta()
 
       // token1Amount * token2Amount = token1Amount' * token2Amount' = (token2Amount + amount) * (token1Amount - quote)
-      let quote = poolAmounts.token1Amount * amount / (poolAmounts.token2Amount + amount);
+      let quote = PoolMeta.token1Amount * amount / (PoolMeta.token2Amount + amount);
 
       return quote
     }
 
     // Get quote for Token2 -> Token1 (given)
     pub fun quoteSwapToken2ForExactToken1(amount: UFix64): UFix64 {
-      let poolAmounts = self.getPoolAmounts()
+      let PoolMeta = self.getPoolMeta()
 
-      assert(poolAmounts.token1Amount > amount, message: "Not enough Token1 in the pool")
+      assert(PoolMeta.token1Amount > amount, message: "Not enough Token1 in the pool")
 
       // token1Amount * token2Amount = token1Amount' * token2Amount' = (token2Amount + quote) * (token1Amount - amount)
-      let quote = poolAmounts.token2Amount * amount / (poolAmounts.token1Amount - amount);
+      let quote = PoolMeta.token2Amount * amount / (PoolMeta.token1Amount - amount);
 
       return quote
     }
@@ -455,7 +419,7 @@ pub contract EmuSwap: FungibleTokens {
       destroy from
     }
 
-    pub fun addLiquidity(from: @EmuSwap.TokenBundle): @EmuSwap.Vault {
+    pub fun addLiquidity(from: @EmuSwap.TokenBundle): @EmuSwap.TokenVault {
       pre {
         EmuSwap.totalSupplyByID[self.ID]! > UFix64(0): "Pair must be initialized by admin first"
       }
@@ -496,7 +460,7 @@ pub contract EmuSwap: FungibleTokens {
       return <- liquidityTokenVault
     }
 
-    pub fun removeLiquidity(from: @EmuSwap.Vault): @EmuSwap.TokenBundle {
+    pub fun removeLiquidity(from: @EmuSwap.TokenVault): @EmuSwap.TokenBundle {
       pre {
         from.balance > UFix64(0): "Empty liquidity token vault"
         from.balance < EmuSwap.totalSupplyByID[self.ID]!: "Cannot remove all liquidity"
@@ -518,12 +482,8 @@ pub contract EmuSwap: FungibleTokens {
       return <- tokenBundle
     }
 
-    access(contract) fun freezePool() {
-      self.isFrozen = true
-    }
-
-    access(contract) fun unfreezePool() {
-      self.isFrozen = false
+    access(contract) fun togglePoolFreeze() {
+      self.isFrozen = !self.isFrozen
     }
 
     init() {
@@ -583,9 +543,9 @@ pub contract EmuSwap: FungibleTokens {
 
 
   pub resource Collection: FungibleTokens.CollectionPublic {
-    pub var ownedVaults: @{UInt64: FungibleTokens.Vault}
+    pub var ownedVaults: @{UInt64: FungibleTokens.TokenVault}
 
-    pub fun deposit(token: @FungibleTokens.Vault) {
+    pub fun deposit(token: @FungibleTokens.TokenVault) {
       if self.ownedVaults[token.tokenID] == nil {
         let nullResource <- 
           self.ownedVaults.insert(key: token.tokenID, <- token)
@@ -599,8 +559,8 @@ pub contract EmuSwap: FungibleTokens {
       return self.ownedVaults.keys
     }
 
-    pub fun borrowVault(id: UInt64): &FungibleTokens.Vault {
-      return &self.ownedVaults[id] as! &FungibleTokens.Vault
+    pub fun borrowVault(id: UInt64): &FungibleTokens.TokenVault {
+      return &self.ownedVaults[id] as! &FungibleTokens.TokenVault
     }
 
       init() {

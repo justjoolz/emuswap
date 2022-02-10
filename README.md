@@ -11,6 +11,11 @@ EmuSwap - Multi token swap contract.
     - Add liquidity
     - Remove liquidity
 
+## Emulator Tests
+
+1. Run emulator ``` flow emulator --verbose```
+
+2. In new terminal window ```./bash/test.sh```
 
 ## Notes on test accounts 
 
