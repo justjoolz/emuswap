@@ -21,7 +21,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   let adminRef: &EmuSwap.Admin
   
   // new pool to deposit to collection
-  let lpTokenVault: @EmuSwap.Vault
+  let lpTokenVault: @EmuSwap.TokenVault
 
   // reference to lp collection
   let lpCollectionRef: &EmuSwap.Collection
@@ -29,6 +29,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   // The Vault reference for liquidity tokens
   //let liquidityTokenRef: &EmuSwap.Vault
 
+  // the signers auth account to pass to execute block
   let signer: AuthAccount
 
   prepare(signer: AuthAccount) {
@@ -41,7 +42,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
         ?? panic("Could not borrow a reference to fusd Vault")
 
     // Create new Pool Vault 
-    self.lpTokenVault <-EmuSwap.createEmptyVault(tokenID: EmuSwap.nextPoolID) //to: EmuSwap.LPTokensStoragePath
+    self.lpTokenVault <-EmuSwap.createEmptyTokenVault(tokenID: EmuSwap.nextPoolID) //to: EmuSwap.LPTokensStoragePath
     
     // check if Collection is created if not then create
     if signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath) == nil {
@@ -75,7 +76,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
 
     // Keep the liquidity provider tokens
     let lpTokens <- self.adminRef.createNewLiquidityPool(from: <- tokenBundle)
-    self.adminRef.unfreezePool(id: 0)
+    self.adminRef.togglePoolFreeze(id: lpTokens.tokenID)
   
     self.lpTokenVault.deposit(from: <-lpTokens )
     self.lpCollectionRef.deposit(token: <- self.lpTokenVault)

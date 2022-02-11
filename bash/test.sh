@@ -1,6 +1,4 @@
 # Bash script for testing contracts, transactions and scripts against the emulator. 
-
-
 # 1. Create accounts 
 
 # Create 3 accounts for testing purposes. 
@@ -40,13 +38,63 @@ flow transactions send "./transactions/demo/mintFUSD.cdc" 1000.0 0x179b6b1cb6755
 flow transactions send "./transactions/demo/mintFUSD.cdc" 1000.0 0xf3fcd2c1a78f5eee
 
 
+flow scripts execute "./scripts/get_dao_fee_percentage.cdc"
+flow scripts execute "./scripts/get_lp_fee_percentage.cdc"
+
+flow transactions send "./transactions/EmuSwap/admin/update_lp_fee_percentage.cdc"  0.0025 --signer "admin-account"
+flow transactions send "./transactions/EmuSwap/admin/update_dao_fee_percentage.cdc" 0.0005 --signer "admin-account"
 
 
-# 4. Create Pools
+# 4. Create Pools (admin adds 10 Flow + 50 FUSD)
+flow transactions send "./transactions/EmuSwap/admin/create_new_pool_FLOW_FUSD.cdc" 100.0 500.0 --signer "admin-account"
 
-flow transactions send "./transactions/EmuSwap/admin/create_new_pool_FLOW_FUSD.cdc" 10.0 50.0 --signer "admin-account"
 
 flow scripts execute "./scripts/get_pool_ids.cdc"
+flow scripts execute "./scripts/get_pool_meta.cdc" 0
+flow scripts execute "./scripts/get_pools_meta.cdc"
 
-flow transactions send "./transactions/EmuSwap/exchange/swap_fusd_for_flow.cdc" 1.0 --signer "user-account2"
+# Get quotes 
+flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+flow scripts execute "./scripts/pool/get_quote_a_to_exact_b.cdc" 0 1.0
+flow scripts execute "./scripts/pool/get_quote_b_to_exact_a.cdc" 0 1.0
+flow scripts execute "./scripts/pool/get_quote_exact_a_to_b.cdc" 0 1.0
+flow scripts execute "./scripts/pool/get_quote_exact_b_to_a.cdc" 0 1.0
+
+# User 1 Swaps Flow->FUSD
 flow transactions send "./transactions/EmuSwap/exchange/swap_flow_for_fusd.cdc" 1.0 --signer "user-account1"
+flow scripts execute "./scripts/get_pools_meta.cdc" 
+flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+
+# User 2 Swaps FUSD->Flow
+flow transactions send "./transactions/EmuSwap/exchange/swap_fusd_for_flow.cdc" 1.0 --signer "user-account2"
+flow scripts execute "./scripts/get_pools_meta.cdc" 
+flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+
+# User 1 Swaps Flow->FUSD
+flow transactions send "./transactions/EmuSwap/exchange/swap_flow_for_fusd.cdc" 1.0 --signer "user-account1"
+flow scripts execute "./scripts/get_pools_meta.cdc" 
+flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+
+# User 2 Swaps FUSD->Flow
+flow transactions send "./transactions/EmuSwap/exchange/swap_fusd_for_flow.cdc" 1.0 --signer "user-account2"
+flow scripts execute "./scripts/get_pools_meta.cdc" 
+flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+
+
+
+# User 1 Adds liquidity
+flow transactions send "./transactions/EmuSwap/exchange/add_liquidity_FLOW_FUSD.cdc" 10.0 5.0 --signer "user-account1"
+flow scripts execute "./scripts/get_pools_meta.cdc" 
+flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+
+# User 2 Adds liquidity
+flow transactions send "./transactions/EmuSwap/exchange/add_liquidity_FLOW_FUSD.cdc" 10.0 5.0 --signer "user-account2"
+flow scripts execute "./scripts/get_pools_meta.cdc" 
+flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+
+# User 2 withdraws some liquidity
+flow transactions send "./transactions/EmuSwap/exchange/remove_liquidity_FLOW_FUSD.cdc" 0.001 --signer "user-account1"
+flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+
+# Read fees collected 
+flow scripts execute "./scripts/read_fees_collected.cdc"
