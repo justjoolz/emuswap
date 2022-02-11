@@ -23,7 +23,6 @@ pub contract EmuSwap: FungibleTokens {
 
   //  unique ID for each pool
   pub var nextPoolID: UInt64
-
   pub var LPFeePercentage: UFix64
   pub var DAOFeePercentage: UFix64
 
@@ -79,9 +78,12 @@ pub contract EmuSwap: FungibleTokens {
   // Resources
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // Pool
+  ///////////////////////////////////////////////////////////////////////////
+  // Pool Resource
   //
-  // Stores funds for pools and functions to interact with the pool
+  // Main resource type created for each swap pool
+  // Stored in a field the contract indexed by ID   
+  //
   pub resource Pool {
     pub let ID: UInt64
 
@@ -92,15 +94,19 @@ pub contract EmuSwap: FungibleTokens {
     access(contract) var token1Vault: @FungibleToken.Vault?
     access(contract) var token2Vault: @FungibleToken.Vault?
 
-    // Check current pool amounts
+    // Get Pool Meta
+    //
+    // Returns metadata information about the pool (j00lz 2 do implement new MetaDataViews standard )
     pub fun getPoolMeta(): PoolMeta {
       pre {
         self.token1Vault != nil && self.token2Vault != nil : "Pools are not initalized!"
       }
-      // return PoolMeta(token1Amount: self.token1Vault?.balance!, token2Amount: self.token2Vault?.balance!)
       return PoolMeta(poolRef: &self as &Pool)
     }
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Function for Quotes
+    //
     // Get quote for Token1 (given) -> Token2
     pub fun quoteSwapExactToken1ForToken2(amount: UFix64): UFix64 {
       let PoolMeta = self.getPoolMeta()
@@ -145,13 +151,15 @@ pub contract EmuSwap: FungibleTokens {
       return quote
     }
 
-    
-
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Swap Functions
+    //
     // Swaps Token1 -> Token2
+    //
     pub fun swapToken1ForToken2(from: @FungibleToken.Vault): @FungibleToken.Vault {
       pre {
         !self.isFrozen: "EmuSwap is frozen"
-        from.balance > UFix64(0): "Empty token vault"
+        from.balance > 0.0: "Empty token vault"
         self.token1Vault != nil : "This should save me doing the if else destroy panic pattern below"
       }
       let originalBalance = from.balance
@@ -165,28 +173,21 @@ pub contract EmuSwap: FungibleTokens {
       let token1Amount = originalBalance * (1.0 - EmuSwap.LPFeePercentage - EmuSwap.DAOFeePercentage)
       let token2Amount = self.quoteSwapExactToken1ForToken2(amount: token1Amount)
 
-      assert(token2Amount > UFix64(0), message: "Exchanged amount too small")
+      assert(token2Amount > 0.0, message: "Exchanged amount too small")
 
-      if self.token1Vault != nil {
-        self.token1Vault?.deposit!(from: <- from)
-      } else {
-        destroy from
-        panic("")
-      }
+      self.token1Vault?.deposit!(from: <- from)
 
       emit Trade(token1Amount: token1Amount, token2Amount: token2Amount, side: 1)
 
-      let token2 <- self.token2Vault?.withdraw(amount: token2Amount)
-        ?? panic("sheit2")
-
-      return <- token2
+      return <- self.token2Vault?.withdraw(amount: token2Amount)!
     }
 
     // Swap Token2 -> Token1
+    //
     pub fun swapToken2ForToken1(from: @FungibleToken.Vault): @FungibleToken.Vault {
       pre {
         !self.isFrozen: "EmuSwap is frozen"
-        from.balance > UFix64(0): "Empty token vault"
+        from.balance > 0.0: "Empty token vault"
         self.token2Vault != nil: "This should save the if else destory panic dance below"
       }
       let originalBalance = from.balance
@@ -200,28 +201,23 @@ pub contract EmuSwap: FungibleTokens {
       let token2Amount = originalBalance * (1.0 - EmuSwap.LPFeePercentage - EmuSwap.DAOFeePercentage)
       let token1Amount = self.quoteSwapExactToken2ForToken1(amount: token2Amount)
 
-      assert(token1Amount > UFix64(0), message: "Exchanged amount too small")
+      assert(token1Amount > 0.0, message: "Exchanged amount too small")
 
-      // 
-      if self.token2Vault != nil {
-        self.token2Vault?.deposit!(from: <- from)
-      } else {
-        destroy from
-        panic("oopsie!")
-      }
-
+      self.token2Vault?.deposit!(from: <- from)
+     
       emit Trade(token1Amount: token1Amount, token2Amount: token2Amount, side: 2)
 
-      let token1 <- self.token1Vault?.withdraw(amount: token1Amount) 
-        ?? panic("sheit")
-      
-      return <- token1
+      return <- self.token1Vault?.withdraw(amount: token1Amount)!
     }
 
+    // Donate Liquidity
+    //
     // Used to add liquidity without minting new liquidity token
+    //
     pub fun donateLiquidity(from: @EmuSwap.TokenBundle) {
       let token1Vault <- from.withdrawToken1()
       let token2Vault <- from.withdrawToken2()
+      destroy from
 
       // Check if vault is initalized otherwise initalize the liquidity
       if self.token1Vault != nil {
@@ -235,20 +231,23 @@ pub contract EmuSwap: FungibleTokens {
       } else {
         self.token2Vault <-! token2Vault
       }
-
-      destroy from
     }
 
+    // Add Liquidity
+    //
+    // Public function to add liquidity to the pool
+    //
     pub fun addLiquidity(from: @EmuSwap.TokenBundle): @EmuSwap.TokenVault {
       pre {
-        EmuSwap.totalSupplyByID[self.ID]! > UFix64(0): "Pair must be initialized by admin first"
+        EmuSwap.totalSupplyByID[self.ID]! > 0.0: "Pair must be initialized by admin first"
       }
 
       let token1Vault <- from.withdrawToken1()
       let token2Vault <- from.withdrawToken2()
+      destroy from
 
-      assert(token1Vault.balance > UFix64(0), message: "Empty token1 vault")
-      assert(token2Vault.balance > UFix64(0), message: "Empty token2 vault")
+      assert(token1Vault.balance > 0.0, message: "Empty token1 vault")
+      assert(token2Vault.balance > 0.0, message: "Empty token2 vault")
 
       // shift decimal 4 places to avoid truncation error
       let token1Percentage: UFix64 = (token1Vault.balance * 10000.0) / self.token1Vault?.balance!
@@ -258,71 +257,53 @@ pub contract EmuSwap: FungibleTokens {
       // to maximize profit, user should add liquidity propotional to current liquidity
       let liquidityPercentage = token1Percentage < token2Percentage ? token1Percentage : token2Percentage;
 
-      assert(liquidityPercentage > UFix64(0), message: "Liquidity too small")
+      assert(liquidityPercentage > 0.0, message: "Insufficient Liquidity provided")
 
-      if token1Vault != nil {
-        self.token1Vault?.deposit!(from: <- token1Vault)
-      } else {
-        destroy token1Vault
-        panic("Don't destroy the vault but keep the checkher happy!")
-      }
+      // deposit liquidity
+      self.token1Vault?.deposit!(from: <- token1Vault)
+      self.token2Vault?.deposit!(from: <- token2Vault)
 
-      if token2Vault != nil {
-        self.token2Vault?.deposit!(from: <- token2Vault)
-      } else {
-        destroy token2Vault
-        panic("Don't destroy the vault but keep the checker happy")
-      }
-
-      let liquidityTokenVault <- EmuSwap.mintTokens(tokenID: 0, amount: (EmuSwap.totalSupplyByID[0]! * liquidityPercentage) / 10000.0)
-
-      destroy from
-      return <- liquidityTokenVault
+      return <- EmuSwap.mintTokens(tokenID: self.ID, amount: (EmuSwap.totalSupplyByID[0]! * liquidityPercentage) / 10000.0)
     }
 
+    // Remove Liquidity
+    //
+    // Function to withdraw users liquidity from the pool
+    // 
     pub fun removeLiquidity(from: @EmuSwap.TokenVault): @EmuSwap.TokenBundle {
       pre {
-        from.balance > UFix64(0): "Empty liquidity token vault"
+        from.balance > 0.0: "Empty LP token vault"
         from.balance < EmuSwap.totalSupplyByID[self.ID]!: "Cannot remove all liquidity"
       }
 
       // shift decimal 4 places to avoid truncation error
       let liquidityPercentage = (from.balance * 10000.0) / EmuSwap.totalSupplyByID[0]!
 
-      assert(liquidityPercentage > UFix64(0), message: "Liquidity too small")
+      assert(liquidityPercentage > 0.0, message: "Insufficient Liquidity")
 
-      // Burn liquidity tokens and withdraw
+      // Burn liquidity tokens and withdraw tokens to bundle
       EmuSwap.burnTokens(from: <- from)
-      
       let token1Vault <- self.token1Vault?.withdraw(amount: (self.token1Vault?.balance! * liquidityPercentage) / 10000.0)!
       let token2Vault <- self.token2Vault?.withdraw(amount: (self.token2Vault?.balance! * liquidityPercentage) / 10000.0)!
 
-      let tokenBundle <- EmuSwap.createTokenBundle(fromToken1: <- token1Vault, fromToken2: <- token2Vault)
-      return <- tokenBundle
+      return <- EmuSwap.createTokenBundle(fromToken1: <- token1Vault, fromToken2: <- token2Vault)
     }
 
+    // Toggle Pool Freeze 
+    //
     access(contract) fun togglePoolFreeze() {
       self.isFrozen = !self.isFrozen
     }
 
+    // Pool Initalization
+    //
     init() {
       self.isFrozen = true // frozen until admin unfreezes
-      
       self.token1Vault <- nil
       self.token2Vault <- nil
 
       self.ID = EmuSwap.nextPoolID
       
-      let tokenName = self.token1Vault.getType().identifier
-        .concat(":")
-        .concat(self.token2Vault.getType().identifier)
-      
-      let tokenSymbol = ""
-
-      // j00lz - could create a linked list of tokens to the pool id... ie. {"FUSD:FLOW": 0}, {FLOW:FUSD: 0} 
-      // so can easily lookup the when exchanging
-      // and create a router that performs multiple swaps?
-
       // Emit an event that shows that the contract was initialized
       emit TokensInitialized(tokenID: self.ID)
       ///emit TokensInitialized(tokenID: self.ID, tokenName: tokenName, tokenSymbol: tokenSymbol, initialSupply: EmuSwap.totalSupplyByID[self.ID]!)
@@ -337,7 +318,7 @@ pub contract EmuSwap: FungibleTokens {
 
   // TokenVault
   //
-  // The LP Tokens issued are stored in a TokenVault
+  // The LP Tokens that are issued are stored in TokenVaults
   pub resource TokenVault: FungibleTokens.Provider, FungibleTokens.Receiver, FungibleTokens.Balance {
 
     // holds the balance of a users tokens
@@ -374,7 +355,7 @@ pub contract EmuSwap: FungibleTokens {
   }
 
 
-  // Token Bundle
+  // Token Bundle 
   //
   pub resource TokenBundle {
     pub var token1: @FungibleToken.Vault
@@ -408,6 +389,11 @@ pub contract EmuSwap: FungibleTokens {
     }
   }
 
+  // Collection
+  //
+  // Stored in users storage
+  // and contains their LP Token Vaults
+  //
   pub resource Collection: FungibleTokens.CollectionPublic {
     pub var ownedVaults: @{UInt64: FungibleTokens.TokenVault}
 
@@ -438,72 +424,35 @@ pub contract EmuSwap: FungibleTokens {
       }
   }
 
-
+  // Admin resource
+  //
+  // Stored in account contract is deployed to on initalization
+  // Only the admin resource can create new pools, update fees and freeze unfreeze pools
+  //
   pub resource Admin {
 
     pub fun createNewLiquidityPool(from: @EmuSwap.TokenBundle): @EmuSwap.TokenVault {
-        /*
-          let token1Vault <- from.withdrawToken1()
-          let token2Vault <- from.withdrawToken2()
-          
-          assert(token1Vault.balance > UFix64(0), message: "Empty token1 vault")
-          assert(token2Vault.balance > UFix64(0), message: "Empty token2 vault")
-          */
+      // create new pool
+      let newPool <- create Pool()
+      
+      // drop liquidity in
+      newPool.donateLiquidity(from: <- from)
 
-          // j00lz notes: 1) shouldn't have to do the if == nil destroy else deposit dance.... 
-          // this is configured to add to the contract.... which is outdated now.... business logic should be moved to the Pool itself.... 
-          
-          // now instead need to
-          // create Pool() 
-          // addLiquidity / donateLiquidity     *(donate == perma locked liquidity :)
-          /*
-          if token1Vault == nil {
-            destroy token1Vault
-          } else {
-            EmuSwap.token1Vault?.deposit(from: <- token1Vault)
-          }
+      // Add new Pool to dictionary
+      EmuSwap.poolsByID[EmuSwap.nextPoolID] <-! newPool
 
-          if token2Vault == nil {
-            destroy token2Vault
-          } else {
-            EmuSwap.token2Vault?.deposit(from: <- token2Vault)
-          }
+      // Create initial tokens
+      let lpTokens <- EmuSwap.mintTokens(tokenID: EmuSwap.nextPoolID, amount: 1.0)
 
-          destroy from
-        */
+      // increment ready for next new pool
+      EmuSwap.nextPoolID = EmuSwap.nextPoolID + 1
+      
+      // j00lz 2do add details to event
+      emit NewSwapPoolCreated()
 
-        // j00lz 2DO .... need to check pool doesn't already exist! (both 1->2 and 2->1 equivalent tokenBundles)
-        
-        // create new pool
-        let newPool <- create Pool()
-        
-        // drop liquidity in
-        newPool.donateLiquidity(from: <- from)
+      return <- lpTokens
+    }
 
-        // Add new Pool to dictionary
-        EmuSwap.poolsByID[EmuSwap.nextPoolID] <-! newPool
-
-        log(EmuSwap.poolsByID[EmuSwap.nextPoolID]?.getPoolMeta())
-
-        // Create initial tokens
-        let lpTokens <- EmuSwap.mintTokens(tokenID: EmuSwap.nextPoolID, amount: 1.0)
-
-        // increment ready for next new pool
-        EmuSwap.nextPoolID = EmuSwap.nextPoolID + 1
-        
-        // j00lz add details to event
-        emit NewSwapPoolCreated()
-
-        return <- lpTokens
-      }
-
-    
-    
-    
-    
-    
-    
-    
     pub fun updateLPFeePercentage(feePercentage: UFix64) {
       EmuSwap.LPFeePercentage = feePercentage
       emit LPFeeUpdated(feePercentage: feePercentage)
@@ -524,14 +473,10 @@ pub contract EmuSwap: FungibleTokens {
   // Public Functions
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // createTokenBundle
-  //
   pub fun createTokenBundle(fromToken1: @FungibleToken.Vault, fromToken2: @FungibleToken.Vault): @EmuSwap.TokenBundle {
     return <- create TokenBundle(fromToken1: <- fromToken1, fromToken2: <- fromToken2)
   }
 
-  // createEmptyTokenVault
-  //
   pub fun createEmptyTokenVault(tokenID: UInt64): @EmuSwap.TokenVault {
     return <-create TokenVault(tokenID: tokenID, balance: 0.0)
   }
@@ -542,7 +487,8 @@ pub contract EmuSwap: FungibleTokens {
 
   // borrowPool
   //
-  // returns reference to the requested pool
+  // returns reference to the requested pool if it exists or nil for caller to handle
+  //
   pub fun borrowPool(id: UInt64): &Pool? {
     if EmuSwap.poolsByID[id] != nil {
       return &EmuSwap.poolsByID[id] as &Pool
@@ -556,6 +502,7 @@ pub contract EmuSwap: FungibleTokens {
     return EmuSwap.poolsByID.keys
   }
 
+  // j00lz todo add these to metadata format... 
   pub fun getLPFeePercentage(): UFix64 {
     return self.LPFeePercentage
   }
@@ -588,7 +535,7 @@ pub contract EmuSwap: FungibleTokens {
   //
   access(contract) fun mintTokens(tokenID: UInt64, amount: UFix64): @EmuSwap.TokenVault {
     pre {
-      amount > UFix64(0): "Amount minted must be greater than zero"
+      amount > 0.0: "Amount minted must be greater than zero"
     }
     if EmuSwap.totalSupplyByID[tokenID] == nil {
       EmuSwap.totalSupplyByID[tokenID] = amount
@@ -628,14 +575,13 @@ pub contract EmuSwap: FungibleTokens {
     emit FeesDeposited(tokenIdentifier: identifier, amount: amount)
   }
 
-  
-
-
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   // Structures
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   // PoolMeta
+  //
+  // Basic metadata about a pool
   //
   pub struct PoolMeta {
     pub let token1Amount: UFix64
@@ -652,6 +598,10 @@ pub contract EmuSwap: FungibleTokens {
     }
   }
   
+  // Contract Initalization
+  // 
+  // Sets up fees, paths and stores Admin resource to storage
+  //  
   init() {
     self.totalSupplyByID = {}
     self.poolsByID <- {}
