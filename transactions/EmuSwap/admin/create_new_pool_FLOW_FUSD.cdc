@@ -26,6 +26,13 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   // reference to lp collection
   let lpCollectionRef: &EmuSwap.Collection
 
+<<<<<<< HEAD
+=======
+  // The Vault reference for liquidity tokens
+  //let liquidityTokenRef: &EmuSwap.Vault
+
+  // the signers auth account to pass to execute block
+>>>>>>> d3c5650 (flesh out tests)
   let signer: AuthAccount
 
   prepare(signer: AuthAccount) {
@@ -72,7 +79,8 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
 
     // Keep the liquidity provider tokens
     let lpTokens <- self.adminRef.createNewLiquidityPool(from: <- tokenBundle)
-    self.adminRef.togglePoolFreeze(id: 0)
+
+    self.adminRef.togglePoolFreeze(id: lpTokens.tokenID)
   
     self.lpTokenVault.deposit(from: <-lpTokens )
     self.lpCollectionRef.deposit(token: <- self.lpTokenVault)
