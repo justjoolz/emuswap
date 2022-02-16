@@ -22,11 +22,13 @@ flow transactions send "./transactions/demo/mintFlowTokens.cdc" 1000.0 0x179b6b1
 flow transactions send "./transactions/demo/mintFlowTokens.cdc" 1000.0 0xf3fcd2c1a78f5eee
 
 # 4. Deploy Project
+read -p "Deploy project...." 
 
-flow project deploy 
+flow project deploy --network emulator
 
 
 # 3. Setup accounts FUSD.
+read -p "Setup accounts ...." 
 
 flow transactions send "./transactions/FUSD/setup.cdc" --signer "admin-account"
 flow transactions send "./transactions/FUSD/setup.cdc" --signer "user-account1"
@@ -46,12 +48,15 @@ flow transactions send "./transactions/EmuSwap/admin/update_dao_fee_percentage.c
 
 
 # 4. Create Pools (admin adds 10 Flow + 50 FUSD)
+read -p "Create Pools ...." 
 flow transactions send "./transactions/EmuSwap/admin/create_new_pool_FLOW_FUSD.cdc" 100.0 500.0 --signer "admin-account"
 
 
 flow scripts execute "./scripts/get_pool_ids.cdc"
 flow scripts execute "./scripts/get_pool_meta.cdc" 0
 flow scripts execute "./scripts/get_pools_meta.cdc"
+
+read -p "Get Quotes ...." 
 
 # Get quotes 
 flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
@@ -60,6 +65,7 @@ flow scripts execute "./scripts/pool/get_quote_b_to_exact_a.cdc" 0 1.0
 flow scripts execute "./scripts/pool/get_quote_exact_a_to_b.cdc" 0 1.0
 flow scripts execute "./scripts/pool/get_quote_exact_b_to_a.cdc" 0 1.0
 
+read -p "Test Swapping ...." 
 # User 1 Swaps Flow->FUSD
 flow transactions send "./transactions/EmuSwap/exchange/swap_flow_for_fusd.cdc" 1.0 --signer "user-account1"
 flow scripts execute "./scripts/get_pools_meta.cdc" 
@@ -81,6 +87,7 @@ flow scripts execute "./scripts/get_pools_meta.cdc"
 flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
 
 
+read -p "Add/remove liquidity ...." 
 
 # User 1 Adds liquidity
 flow transactions send "./transactions/EmuSwap/exchange/add_liquidity_FLOW_FUSD.cdc" 10.0 5.0 --signer "user-account1"
