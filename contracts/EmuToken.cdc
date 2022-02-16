@@ -159,22 +159,22 @@ pub contract EmuToken: FungibleToken {
             let team            <- vault.withdraw(amount: 0.20 * self.totalSupply)  // time release contract
          */
         
-        self.account.save(<-vault, to: /storage/EmuTokenVault)
+        self.account.save(<-vault, to: EmuToken.EmuTokenStoragePath)
 
         // Create a public capability to the stored Vault that only exposes
         // the `deposit` method through the `Receiver` interface
         //
         self.account.link<&EmuToken.Vault{FungibleToken.Receiver}>(
-            /public/EmuTokenReceiver,
-            target: /storage/EmuTokenVault
+            EmuToken.EmuTokenReceiverPublicPath,
+            target: EmuToken.EmuTokenStoragePath
         )
 
         // Create a public capability to the stored Vault that only exposes
         // the `balance` field through the `Balance` interface
         //
         self.account.link<&EmuToken.Vault{FungibleToken.Balance}>(
-            /public/EmuTokenBalance,
-            target: /storage/EmuTokenVault
+            EmuToken.EmuTokenBalancePublicPath,
+            target: EmuToken.EmuTokenStoragePath
         )
 
         // Emit an event that shows that the contract was initialized

@@ -55,6 +55,7 @@ flow transactions send "./transactions/EmuSwap/admin/update_dao_fee_percentage.c
 # 4. Create Pools (admin adds 10 Flow + 50 FUSD)
 read -p "Create Pools ...." 
 flow transactions send "./transactions/EmuSwap/admin/create_new_pool_FLOW_FUSD.cdc" 100.0 500.0 --signer "admin-account"
+flow transactions send "./transactions/EmuSwap/admin/create_new_pool_EMU_FUSD.cdc" 100.0 100.0 --signer "admin-account"
 
 
 flow scripts execute "./scripts/get_pool_ids.cdc"
