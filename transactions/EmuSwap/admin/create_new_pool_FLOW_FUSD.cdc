@@ -26,13 +26,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   // reference to lp collection
   let lpCollectionRef: &EmuSwap.Collection
 
-<<<<<<< HEAD
-=======
-  // The Vault reference for liquidity tokens
-  //let liquidityTokenRef: &EmuSwap.Vault
 
-  // the signers auth account to pass to execute block
->>>>>>> d3c5650 (flesh out tests)
   let signer: AuthAccount
 
   prepare(signer: AuthAccount) {
@@ -52,13 +46,6 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
       // Create a new Collection and put it in storage
       signer.save(<- EmuSwap.createEmptyCollection(), to: EmuSwap.LPTokensStoragePath)
       
-      /*
-      // Create a public capability to the Collection that only exposes
-      signer.link<&EmuSwap.Collection{FungibleTokens.CollectionPublic}>(
-        EmuSwap.LPTokensPublicReceiverPath,
-        target: EmuSwap.LPTokensStoragePath
-      )
-       */
       
     }
     self.lpCollectionRef = signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath)!
