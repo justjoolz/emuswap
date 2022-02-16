@@ -13,6 +13,6 @@ transaction(id: UInt64) {
   }
 
   execute {
-    self.adminRef.unfreezePool(id: id)
+    self.adminRef.togglePoolFreeze(id: id)
   }
 }

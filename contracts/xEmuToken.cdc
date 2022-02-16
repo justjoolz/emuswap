@@ -3,8 +3,15 @@
 // Yield bearing token....
 //
 // User stakes Emu using enterPool function
-// User e
-// Issued to user when they deposit Emu tokens 
+// xEmu tokens are Issued to user when they deposit Emu tokens 
+
+// User can unstake at any time by calling leavePool function
+// Sending in xEmu and getting the appropriate amount of emu in return
+
+// the depositRewards function accepts only Emu tokens and can be called by any other user or contract
+//
+
+
 
 import FungibleToken from "./dependencies/FungibleToken.cdc"
 import EmuToken from "./EmuToken.cdc"
@@ -108,7 +115,8 @@ pub contract xEmuToken: FungibleToken {
         return <-create Vault(balance: 0.0)
     }
 
-    
+
+    // Access Contract Minting and Burning functionality 
     // mintTokens
     //
     // Function that mints new tokens, adds them to the total supply,
@@ -117,7 +125,6 @@ pub contract xEmuToken: FungibleToken {
     access(contract) fun mintTokens(amount: UFix64): @xEmuToken.Vault {
         pre {
             amount > 0.0: "Amount minted must be greater than zero"
-            amount <= amount: "Amount minted must be less than the allowed amount"
         }
         xEmuToken.totalSupply = xEmuToken.totalSupply + amount
         emit TokensMinted(amount: amount)
@@ -144,6 +151,9 @@ pub contract xEmuToken: FungibleToken {
     // Return freshly minted xEmu
     //
     pub fun enterPool(emuTokens: @FungibleToken.Vault): @FungibleToken.Vault {
+        pre {
+            emuTokens.balance > 0.0 : "Insufficient tokens!"
+        }
         // Gets the amount of Emu locked in the contract
         let totalEmu = self.emuPool.balance
         // Gets the amount of xEmu in existence
@@ -171,6 +181,10 @@ pub contract xEmuToken: FungibleToken {
     // Returns the staked + gained Emu and burns xEmu
     //
     pub fun leavePool(xEmuVault: @FungibleToken.Vault): @FungibleToken.Vault {
+        pre {
+            self.emuPool.balance > 0.0 : "Pool is empty!"
+            xEmuVault.balance > 0.0 : "Insufficient xEmu Tokens!"
+        }
         // Calculates the amount of Emu the xEmu is worth
         let amount = xEmuVault.balance * self.emuPool.balance / self.totalSupply
         
@@ -221,10 +235,6 @@ pub contract xEmuToken: FungibleToken {
             /public/xEmuTokenBalance,
             target: self.xEmuTokenVaultStoragePath
         )
-
-        // j00lz 2do remove Administrator completely
-        // let admin <- create Administrator()
-        // adminAccount.save(<-admin, to: /storage/EmuTokenAdmin)
 
         // Emit an event that shows that the contract was initialized
         emit TokensInitialized(initialSupply: self.totalSupply)

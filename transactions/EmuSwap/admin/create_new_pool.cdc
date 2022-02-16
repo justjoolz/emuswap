@@ -1,6 +1,5 @@
 // create_new_pool.cd 
 //
-// This transaction creates a new Flow/FUSD pool..... 
 
 import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
@@ -73,7 +72,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
     // Keep the liquidity provider tokens
     let lpTokens <- self.adminRef.createNewLiquidityPool(from: <- tokenBundle)
     self.adminRef.togglePoolFreeze(id: 0)
-  
+    
     self.lpTokenVault.deposit(from: <-lpTokens )
     self.lpCollectionRef.deposit(token: <- self.lpTokenVault)
     //self.signer.save(<- lpTokens, to: /storage/LPToken)

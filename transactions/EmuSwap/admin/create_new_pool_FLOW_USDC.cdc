@@ -8,14 +8,14 @@ import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
 
 // hardcoded to create Flow/FUSD pool
 import FlowToken from "../../../contracts/dependencies/FlowToken.cdc"
-import FUSD from "../../../contracts/dependencies/FUSD.cdc"
+import FiatToken from "../../../contracts/dependencies/FiatToken.cdc"
 
 
 transaction(token1Amount: UFix64, token2Amount: UFix64) {
 
   // The Vault references that holds the tokens that are being transferred
   let flowTokenVaultRef: &FlowToken.Vault
-  let fusdVaultRef: &FUSD.Vault
+  let usdcVaultRef: &FiatToken.Vault
 
   // EmuSwap Admin Ref
   let adminRef: &EmuSwap.Admin
@@ -26,6 +26,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   // reference to lp collection
   let lpCollectionRef: &EmuSwap.Collection
 
+
   let signer: AuthAccount
 
   prepare(signer: AuthAccount) {
@@ -34,8 +35,8 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
     self.flowTokenVaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
         ?? panic("Could not borrow a reference to Vault")
 
-    self.fusdVaultRef = signer.borrow<&FUSD.Vault>(from: /storage/fusdVault)
-        ?? panic("Could not borrow a reference to fusd Vault")
+    self.usdcVaultRef = signer.borrow<&FiatToken.Vault>(from: FiatToken.VaultStoragePath)
+        ?? panic("Could not borrow a reference to FiatToken Vault (USDC)")
 
     // Create new Pool Vault 
     self.lpTokenVault <-EmuSwap.createEmptyTokenVault(tokenID: EmuSwap.nextPoolID) //to: EmuSwap.LPTokensStoragePath
@@ -65,16 +66,19 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   execute {
     // Withdraw tokens
     let token1Vault <- self.flowTokenVaultRef.withdraw(amount: token1Amount) as! @FlowToken.Vault
-    let token2Vault <- self.fusdVaultRef.withdraw(amount: token2Amount) as! @FUSD.Vault
+    let token2Vault <- self.usdcVaultRef.withdraw(amount: token2Amount) as! @FiatToken.Vault
 
     // Provide liquidity and get liquidity provider tokens
     let tokenBundle <- EmuSwap.createTokenBundle(fromToken1: <- token1Vault, fromToken2: <- token2Vault)
 
     // Keep the liquidity provider tokens
     let lpTokens <- self.adminRef.createNewLiquidityPool(from: <- tokenBundle)
-    self.adminRef.togglePoolFreeze(id: 0)
+    self.adminRef.togglePoolFreeze(id: lpTokens.tokenID)
   
+    // deposit new lp tokens in local vault
     self.lpTokenVault.deposit(from: <-lpTokens )
+
+    // deposit to collection in storage
     self.lpCollectionRef.deposit(token: <- self.lpTokenVault)
     //self.signer.save(<- lpTokens, to: /storage/LPToken)
   }

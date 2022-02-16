@@ -26,13 +26,10 @@ transaction(amountIn: UFix64) {
 
   execute {    
     
-    self.poolRef.getPoolAmounts()
-    /*
     let token2Vault <- self.fusdVaultRef.withdraw(amount: amountIn) as! @FUSD.Vault
 
     let token1Vault <- self.poolRef.swapToken2ForToken1(from: <-token2Vault)
 
     self.flowTokenVaultRef.deposit(from: <- token1Vault)
-     */
   }
 }

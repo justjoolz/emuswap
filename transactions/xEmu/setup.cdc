@@ -1,10 +1,10 @@
 import FungibleToken from "../../contracts/dependencies/FungibleToken.cdc"
-import FUSD from "../../contracts/dependencies/FUSD.cdc"
+import xEmuToken from "../../contracts/xEmuToken.cdc"
 
 transaction {
   prepare(signer: AuthAccount) {
 
-    let existingVault = signer.borrow<&FUSD.Vault>(from: /storage/fusdVault)
+    let existingVault = signer.borrow<&xEmuToken.Vault>(from: xEmuToken.xEmuTokenVaultStoragePath)
 
     // If the account is already set up that's not a problem, but we don't want to replace it
     if (existingVault != nil) {
@@ -12,21 +12,21 @@ transaction {
     }
     
     // Create a new FUSD Vault and put it in storage
-    signer.save(<-FUSD.createEmptyVault(), to: /storage/fusdVault)
+    signer.save(<-xEmuToken.createEmptyVault(), to: xEmuToken.xEmuTokenVaultStoragePath)
 
     // Create a public capability to the Vault that only exposes
     // the deposit function through the Receiver interface
-    signer.link<&FUSD.Vault{FungibleToken.Receiver}>(
-      /public/fusdReceiver,
-      target: /storage/fusdVault
+    signer.link<&xEmuToken.Vault{FungibleToken.Receiver}>(
+      xEmuToken.xEmuTokenReceiverPublicPath,
+      target: xEmuToken.xEmuTokenVaultStoragePath
     )
 
     // Create a public capability to the Vault that only exposes
     // the balance field through the Balance interface
     
     signer.link<&FUSD.Vault{FungibleToken.Balance}>(
-      /public/fusdBalance,
-      target: /storage/fusdVault
+      xEmuToken.xEmuTokenBalancePublicPath,
+      target: xEmuToken.xEmuTokenVaultStoragePath
     )
     
   }
