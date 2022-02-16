@@ -34,6 +34,11 @@ flow transactions send "./transactions/FUSD/setup.cdc" --signer "admin-account"
 flow transactions send "./transactions/FUSD/setup.cdc" --signer "user-account1"
 flow transactions send "./transactions/FUSD/setup.cdc" --signer "user-account2"
 
+# Setup EmuToken 
+flow transactions send "./transactions/EmuToken/setup.cdc" --signer "admin-account"
+flow transactions send "./transactions/EmuToken/setup.cdc" --signer "user-account1"
+flow transactions send "./transactions/EmuToken/setup.cdc" --signer "user-account2"
+
 
 flow transactions send "./transactions/demo/mintFUSD.cdc" 1000.0 0x01cf0e2f2f715450
 flow transactions send "./transactions/demo/mintFUSD.cdc" 1000.0 0x179b6b1cb6755e31

@@ -5,6 +5,12 @@ pub contract EmuToken: FungibleToken {
     // Total supply of Flow tokens in existence
     pub var totalSupply: UFix64
 
+    // Storage Paths
+    pub let EmuTokenStoragePath: StoragePath
+    pub let EmuTokenBalancePublicPath: PublicPath
+    pub let EmuTokenReceiverPublicPath: PublicPath 
+
+
     // Event that is emitted when the contract is created
     pub event TokensInitialized(initialSupply: UFix64)
 
@@ -121,6 +127,11 @@ pub contract EmuToken: FungibleToken {
 
     init() {
         self.totalSupply = 100_000_000.0
+
+        // init storage paths
+        self.EmuTokenStoragePath = /storage/emuTokenVault
+        self.EmuTokenBalancePublicPath = /public/emuTokenBalance
+        self.EmuTokenReceiverPublicPath = /public/emuTokenReceiver
 
         // Create the Vault with the total supply of tokens and save it in storage
         //
