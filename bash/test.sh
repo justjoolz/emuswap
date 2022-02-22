@@ -55,7 +55,6 @@ flow transactions send "./transactions/EmuSwap/admin/update_dao_fee_percentage.c
 # 4. Create Pools (admin adds 10 Flow + 50 FUSD)
 read -p "Create Pools ...." 
 flow transactions send "./transactions/EmuSwap/admin/create_new_pool_FLOW_FUSD.cdc" 100.0 500.0 --signer "admin-account"
-flow transactions send "./transactions/EmuSwap/admin/create_new_pool_EMU_FUSD.cdc" 100.0 100.0 --signer "admin-account"
 
 
 flow scripts execute "./scripts/get_pool_ids.cdc"
@@ -93,13 +92,6 @@ flow scripts execute "./scripts/get_pools_meta.cdc"
 flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
 
 
-read -p "Test Emu Pool Swapping ...." 
-flow transactions send "./transactions/EmuSwap/exchange/swap_emu_for_fusd.cdc" 100.0 --signer "admin-account"
-flow transactions send "./transactions/EmuSwap/exchange/swap_fusd_for_emu.cdc" 100.0 --signer "user-account2"
-flow transactions send "./transactions/EmuSwap/exchange/swap_fusd_for_emu.cdc" 100.0 --signer "user-account1"
-
-
-
 read -p "Add/remove liquidity ...." 
 
 # User 1 Adds liquidity
@@ -114,26 +106,6 @@ flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
 
 # User 2 withdraws some liquidity
 flow transactions send "./transactions/EmuSwap/exchange/remove_liquidity_FLOW_FUSD.cdc" 0.001 --signer "user-account1"
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
-
-# Read fees collected 
-flow scripts execute "./scripts/read_fees_collected.cdc"
-
-
-
-# Emu Token add/remove liquidity test
-# User 1 Adds liquidity
-flow transactions send "./transactions/EmuSwap/exchange/add_liquidity_EMU_FUSD.cdc" 10.0 5.0 --signer "user-account1"
-flow scripts execute "./scripts/get_pools_meta.cdc" 
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
-
-# User 2 Adds liquidity
-flow transactions send "./transactions/EmuSwap/exchange/add_liquidity_EMU_FUSD.cdc" 10.0 5.0 --signer "user-account2"
-flow scripts execute "./scripts/get_pools_meta.cdc" 
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
-
-# User 2 withdraws some liquidity
-flow transactions send "./transactions/EmuSwap/exchange/remove_liquidity_EMU_FUSD.cdc" 0.001 --signer "user-account1"
 flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
 
 # Read fees collected 

@@ -27,6 +27,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   let lpCollectionRef: &EmuSwap.Collection
 
 
+  // the signers auth account to pass to execute block
   let signer: AuthAccount
 
   prepare(signer: AuthAccount) {
