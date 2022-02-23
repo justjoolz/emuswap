@@ -39,7 +39,8 @@
 		"Test": "./contracts/Test.cdc",
 		"FungibleTokens": "./contracts/dependencies/FungibleTokens.cdc",
 		"EmuSwap": "./contracts/exchange/EmuSwap.cdc",
-		"EmuToken": "./contracts/EmuToken.cdc"
+		"EmuToken": "./contracts/EmuToken.cdc",
+		"StakingRewards": "./contracts/StakingRewards.cdc"
 	},
 	"networks": {
 		"emulator": "127.0.0.1:3569",
@@ -82,7 +83,8 @@
 			],
 			"admin-account": [
 				"EmuSwap",
-				"EmuToken"
+				"EmuToken",
+				"StakingRewards"
 			]
 		},
 		"testnet": {
