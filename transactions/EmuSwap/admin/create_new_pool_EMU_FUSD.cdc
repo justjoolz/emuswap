@@ -49,13 +49,11 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
       // Create a new Collection and put it in storage
       signer.save(<- EmuSwap.createEmptyCollection(), to: EmuSwap.LPTokensStoragePath)
       
-      /*
       // Create a public capability to the Collection that only exposes
       signer.link<&EmuSwap.Collection{FungibleTokens.CollectionPublic}>(
         EmuSwap.LPTokensPublicReceiverPath,
         target: EmuSwap.LPTokensStoragePath
       )
-       */
       
     }
     self.lpCollectionRef = signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath)!
@@ -80,6 +78,5 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   
     self.lpTokenVault.deposit(from: <-lpTokens )
     self.lpCollectionRef.deposit(token: <- self.lpTokenVault)
-    //self.signer.save(<- lpTokens, to: /storage/LPToken)
   }
 }

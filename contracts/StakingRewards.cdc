@@ -13,6 +13,7 @@ import EmuSwap from "./exchange/EmuSwap.cdc"
 // https://dev.sushi.com/sushiswap/contracts/masterchefv2
 
 pub contract StakingRewards {
+    pub let PRECISION: UFix64
 
     // Main Vault with all Emu reward tokens
     // j00lz can maybe wrap these as emissions incentivzor or  something so can use other tokens later :)
@@ -34,7 +35,7 @@ pub contract StakingRewards {
     pub event EmissionRateUpdated(newRate: UFix64)          // j00lz todo needs to have poolID too
     pub event TokensStaked(address: Address, amountStaked: UFix64, totalStaked: UFix64)
     pub event TokensUnstaked(address: Address, amountUnstaked: UFix64, totalStaked: UFix64)
-    pub event RewardsClaimed(address: Address, amountClaimed: UFix64, totalClaimed: UFix64, totalRemaining: UFix64)
+    pub event RewardsClaimed(address: Address, amountClaimed: UFix64, rewardDebt: Fix64, totalRemaining: UFix64)
 
     // Testing Mock time
     access(contract) var mockTime: Bool
@@ -73,8 +74,17 @@ pub contract StakingRewards {
         // (tokens staked or unstaked)
         //
         access(contract) fun updateFarm() {
+            log("Updating Farm~~~~~~~~~~~~~~~~~~~~")
+            log("totalAccumulatedTokensPerShare, lastRewardTimestamp")
+            log(self.totalAccumulatedTokensPerShare)
+            log(self.lastRewardTimestamp)
+
+
             self.rewardTokensPerSecond = StakingRewards.getCurrentEmissionRate() 
             let now = StakingRewards.now()
+
+            log("now")
+            log(now)
 
             if now <= self.lastRewardTimestamp {    // already up to date
                 self.lastRewardTimestamp = now
@@ -87,10 +97,52 @@ pub contract StakingRewards {
             }
 
             let period = now - self.lastRewardTimestamp // time delta (aka masterchef 'multiplier')
-            let reward = period * self.rewardTokensPerSecond * StakingRewards.farmWeightsByID[self.emuSwapPoolID]! / StakingRewards.totalWeight
+            log("period")
+            log(period)
+            
+            let farmWeight = StakingRewards.farmWeightsByID[self.emuSwapPoolID]! / StakingRewards.totalWeight 
+            
+            let reward = period * self.rewardTokensPerSecond * farmWeight
+            log("reward, self.totalStaked")
+            log(reward)
+            log(self.totalStaked)
 
-            self.totalAccumulatedTokensPerShare = self.totalAccumulatedTokensPerShare + (reward / self.totalStaked) // original splits this between dev treasury and farm
+            self.totalAccumulatedTokensPerShare = self.totalAccumulatedTokensPerShare + (reward * StakingRewards.PRECISION / self.totalStaked) // original splits this between dev treasury and farm
             self.lastRewardTimestamp = now
+            log("totalAccumulatedTokensPerShare, lastRewardTimestamp")
+            log(self.totalAccumulatedTokensPerShare)
+            log(self.lastRewardTimestamp)
+        }
+
+        // Get Pending Rewards Function
+        //
+        // Gets the total Pending rewards for an address
+        // To be called by front end UI and used in metadata
+        //
+        pub fun getPendingRewards(address: Address): Fix64 {
+            log("get pending rewards")
+            log("address: ".concat(address.toString()))
+            let now = StakingRewards.now()
+            let stakeRef = &self.stakes[address] as &Stake
+
+            var totalAccumulatedTokensPerShare = self.totalAccumulatedTokensPerShare
+            
+            if (now > self.lastRewardTimestamp) && (stakeRef.lpTokenVault.balance > 0.0) {
+                let delta = now - self.lastRewardTimestamp
+                let farmWeight = StakingRewards.farmWeightsByID[stakeRef.lpTokenVault.tokenID]! / StakingRewards.totalWeight
+                let reward = delta * self.rewardTokensPerSecond * farmWeight
+                totalAccumulatedTokensPerShare = self.totalAccumulatedTokensPerShare  + (reward * StakingRewards.PRECISION / self.totalStaked)
+                log("delta, farmWeight, reward, totalAccumulatedTokenPerShare, rewardDebt, pending")
+                log(delta)
+                log(farmWeight)
+                log(reward)
+                log(totalAccumulatedTokensPerShare)
+                log(stakeRef.rewardDebt)
+            }
+            let pending = Fix64(stakeRef.lpTokenVault.balance * totalAccumulatedTokensPerShare / StakingRewards.PRECISION ) - stakeRef.rewardDebt
+            log(pending)
+
+            return pending 
         }
         
         // Stake function
@@ -100,8 +152,10 @@ pub contract StakingRewards {
         //
         // MasterChef style is to stake 0 lp tokens to trigger payout.... (you claim whenever you add or remove stake)
         pub fun stake(lpTokens: @FungibleTokens.TokenVault, lpTokensReceiverCap: Capability<&{FungibleTokens.CollectionPublic}>, rewardsReceiverCap: Capability<&{FungibleToken.Receiver}>): @StakeController? {    
+            log("Stake")
             self.updateFarm()
-
+            log("farm updated")
+            
             if self.stakes.length == 0 {
                 StakingRewards.rewardsGenesisTimestamp = self.lastRewardTimestamp
             }
@@ -111,16 +165,32 @@ pub contract StakingRewards {
             // Get amount of tokens to add to stake
             let amountStaked = lpTokens.balance
             // Get reference to users stake
+            
+            log("totalStaked, totalAccumulatedTokensPerShare  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" )
+            log(self.totalStaked)
+            log(self.totalAccumulatedTokensPerShare)
 
             // Update users stake 
-            if !self.stakes.containsKey(lpTokensReceiverCap.address) { // New Stake 
+            if !self.stakes.containsKey(lpTokensReceiverCap.address) { // New Stake
+
+                log("YO!")
+                log(amountStaked)
+                log(self.totalAccumulatedTokensPerShare)
+                let rewardDebt = Fix64(amountStaked * self.totalAccumulatedTokensPerShare / StakingRewards.PRECISION)
+            
+                let newStake <- create Stake(lpTokens: <- lpTokens, rewardDebt: rewardDebt, lpTokenReceiverCap: lpTokensReceiverCap, rewardsReceiverCap: rewardsReceiverCap)
+                
+                log("REWARD DEBT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                log(newStake.rewardDebt)
+
                 // Insert into the Farms stakes field
                 let temp 
-                    <- self.stakes.insert(key: lpTokensReceiverCap.address, <- create Stake(lpTokens: <- lpTokens, lpTokenReceiverCap: lpTokensReceiverCap, rewardsReceiverCap: rewardsReceiverCap))
+                    <- self.stakes.insert(key: lpTokensReceiverCap.address, <- newStake)
                 destroy temp
-
                 // update Farm total staked
                 self.totalStaked = self.totalStaked + amountStaked
+
+                
 
                 emit TokensStaked(address: lpTokensReceiverCap.address, amountStaked: amountStaked, totalStaked: self.totalStaked)
 
@@ -136,6 +206,10 @@ pub contract StakingRewards {
                 // update Farm total
                 self.totalStaked = self.totalStaked + amountStaked
                 
+                stakeRef.setRewardDebt( stakeRef.rewardDebt + Fix64(amountStaked * self.totalAccumulatedTokensPerShare / StakingRewards.PRECISION))  
+                log("REWARD DEBT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                log(stakeRef.rewardDebt)            
+
                 emit TokensStaked(address: lpTokensReceiverCap.address, amountStaked: amountStaked, totalStaked: self.totalStaked)
 
                 return nil // no need to give them a new StakeController
@@ -161,6 +235,12 @@ pub contract StakingRewards {
             // Withdraw requested amount of LP Tokens and return to the user
             let receiverRef = stakeControllerRef.lpTokenReceiverCap.borrow()
             let stakeRef = &self.stakes[stakeControllerRef.lpTokenReceiverCap.address] as &Stake
+            
+            log("MATH~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            log(stakeRef.rewardDebt)
+            log(amount * self.totalAccumulatedTokensPerShare)
+            stakeRef.setRewardDebt( stakeRef.rewardDebt - Fix64(amount * self.totalAccumulatedTokensPerShare / StakingRewards.PRECISION))
+            
             let tokens <- stakeRef.lpTokenVault.withdraw(amount: amount)
             receiverRef?.deposit!(from: <- tokens)
 
@@ -172,13 +252,12 @@ pub contract StakingRewards {
             ///// j00lz 2 do check if the update farm needs to go above the depositing above.... possibly balance changes?
             // this code returns all pending rewards on unstaking..... 
             /*
-            let pending = (stakeRef.lpTokenVault.balance * self.totalAccumulatedTokensPerShare) - stakeRef.totalClaimed 
+            let pending = (stakeRef.lpTokenVault.balance * self.totalAccumulatedTokensPerShare) - stakeRef.rewardDebt 
 
             // distribute pending 
             let rewards <- StakingRewards.vault.withdraw(amount: pending)
             let rewardsReceiverRef = stakeControllerRef.rewardsReceiverCap.borrow()!
             rewardsReceiverRef.deposit(from: <- rewards)
-            stakeRef.updateTotalClaimed(total: stakeRef.lpTokenVault.balance * self.totalAccumulatedTokensPerShare)
              */
         }
 
@@ -186,56 +265,42 @@ pub contract StakingRewards {
         // Claim Rewards
         // j00lz todo needs optimizing (repeated call of getPendingRewards)
         // can consider refactoring these 2 functions into the stake resource....
-        pub fun claimRewards(stakeControllerRef: &StakeController, amount: UFix64) {
-            pre {
-                amount > 0.0 : "Cannot withdraw 0 tokens!"
-                /*
-                amount <= stakeRef.getPendingRewards() : "Amount requested greater than rewards available! "
-                    .concat(amount)
-                    .concat(" requested ")
-                    .concat(stakeRef.getPendingRewards())
-                    .concat(" available")
-                 */
-            }
+        pub fun claimRewards(stakeControllerRef: &StakeController) {
             self.updateFarm()
             let stakeRef = stakeControllerRef.borrowStake()
             
             // j00lz swapped this line for the working getPendingRewards function..... otherwise self.totalAccumulatedTokensPerShare is always 0 ???????  
-            let pending = stakeRef.lpTokenVault.balance * self.totalAccumulatedTokensPerShare - stakeRef.totalClaimed
+            // let pending = stakeRef.lpTokenVault.balance * self.totalAccumulatedTokensPerShare - stakeRef.rewardDebt
+            
+            let accumulatedTokens = stakeRef.lpTokenVault.balance * self.totalAccumulatedTokensPerShare
+            let pending = Fix64(accumulatedTokens) - stakeRef.rewardDebt
+
+            //let pending = stakeRef.lpTokenVault.balance * self.totalAccumulatedTokensPerShare - stakeRef.rewardDebt
             // let pending = self.getPendingRewards(address: stakeRef.rewardsReceiverCap.address)
 
-            assert(amount <= pending, message: "Amount requested greater than rewards available!"
-                    .concat(amount.toString())
-                    .concat(" requested ")
-                    .concat(pending.toString())
-                    .concat(" available")
-            )
-            // distribute pending
-            let rewards <- StakingRewards.vault.withdraw(amount: amount)
-            stakeRef.rewardsReceiverCap.borrow()!.deposit(from: <-rewards)
+            // update reward debt
+            stakeRef.setRewardDebt(Fix64(accumulatedTokens))
 
-            stakeRef.updateTotalClaimed(delta: amount)
-            emit RewardsClaimed(address: stakeRef.rewardsReceiverCap.address, amountClaimed: amount, totalClaimed: stakeRef.totalClaimed, totalRemaining: StakingRewards.vault.balance)
+            // distribute pending
+            let rewards <- StakingRewards.vault.withdraw(amount: UFix64(pending))
+            stakeRef.rewardsReceiverCap.borrow()!.deposit(from: <-rewards)
+            log(
+                "user: ".concat(
+                    stakeRef.rewardsReceiverCap.address.toString().concat(
+                        " claimed: ".concat(
+                            pending.toString().concat(
+                                " rewardDebt:".concat(
+                                    stakeRef.rewardDebt.toString()
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+            emit RewardsClaimed(address: stakeRef.rewardsReceiverCap.address, amountClaimed: UFix64(pending), rewardDebt: stakeRef.rewardDebt, totalRemaining: StakingRewards.vault.balance)
         }    
 
-        // Get Pending Rewards Function
-        //
-        // Gets the total Pending rewards for an address
-        // To be called by front end UI and used in metadata
-        //
-        pub fun getPendingRewards(address: Address): UFix64 {
-            let now = StakingRewards.now()
-            let stakeRef = &self.stakes[address] as &Stake
 
-            if now > self.lastRewardTimestamp && stakeRef.lpTokenVault.balance > 0.0 {
-                let delta = now - self.lastRewardTimestamp
-                let farmWeight = StakingRewards.farmsByID[stakeRef.lpTokenVault.tokenID]?.totalStaked! / StakingRewards.totalWeight
-                let reward = delta * self.rewardTokensPerSecond * farmWeight
-                let totalAccumulatedTokensPerShare = self.totalAccumulatedTokensPerShare + (reward / self.totalStaked)
-                return stakeRef.lpTokenVault.balance * totalAccumulatedTokensPerShare - stakeRef.totalClaimed
-            }
-            return 0.0
-        }
 
         init(poolID: UInt64) {
             self.stakes <- {}
@@ -251,32 +316,6 @@ pub contract StakingRewards {
         }
     }
 
-    // Admin resource
-    //
-    // only admin can create farms and update pool weights
-    pub resource Admin {
-        pub fun createFarm(poolID: UInt64, weight: UFix64) {
-            pre {
-                weight > 0.0 : "Farm weight must be positive"
-                EmuSwap.getPoolIDs().contains(poolID) : "Pool does not exist on EmuSwap!"
-            }
-            let newFarm <- create Farm(poolID: poolID)
-            let nullResource <- 
-                StakingRewards.farmsByID.insert(key: poolID, <- newFarm)
-            destroy nullResource
-            StakingRewards.farmWeightsByID.insert(key: poolID, weight)
-            StakingRewards.totalWeight = StakingRewards.totalWeight + weight 
-            
-            emit NewFarmCreated(farmID: poolID, weight: weight, totalWeight: StakingRewards.totalWeight)
-        }
-
-        pub fun updateFarmWeight(farmID: UInt64, newWeight: UFix64) {
-            let oldWeight = StakingRewards.farmWeightsByID[farmID]!
-            StakingRewards.farmWeightsByID[farmID] = newWeight
-            StakingRewards.totalWeight = StakingRewards.totalWeight - oldWeight + newWeight
-        }
-    }
-
     // Stake Resource
     //
     // Holds the staked funds of the user. (lp)
@@ -289,17 +328,17 @@ pub contract StakingRewards {
         //pub var rewards: @FungibleToken.Vault
         pub var lpTokenReceiverCap: Capability<&{FungibleTokens.CollectionPublic}>
         pub var rewardsReceiverCap: Capability<&{FungibleToken.Receiver}>
-        pub var totalClaimed: UFix64 // aka reward debt
+        pub var rewardDebt: Fix64 // aka reward debt
 
-        init(lpTokens: @FungibleTokens.TokenVault, lpTokenReceiverCap: Capability<&{FungibleTokens.CollectionPublic}>, rewardsReceiverCap: Capability<&{FungibleToken.Receiver}>) {
+        init(lpTokens: @FungibleTokens.TokenVault, rewardDebt: Fix64, lpTokenReceiverCap: Capability<&{FungibleTokens.CollectionPublic}>, rewardsReceiverCap: Capability<&{FungibleToken.Receiver}>) {
             self.lpTokenVault <- lpTokens
             self.lpTokenReceiverCap = lpTokenReceiverCap
             self.rewardsReceiverCap = rewardsReceiverCap
-            self.totalClaimed = 0.0
+            self.rewardDebt = rewardDebt
         }
 
-        access(contract) fun updateTotalClaimed(delta: UFix64) {
-            self.totalClaimed = self.totalClaimed + delta
+        access(contract) fun setRewardDebt(_ debt: Fix64) {
+            self.rewardDebt = debt 
         }
 
         destroy () {
@@ -310,11 +349,13 @@ pub contract StakingRewards {
 
     pub struct StakeInfo {
         pub let address: Address
-        pub let totalClaimed: UFix64
-        pub let pendingRewards: UFix64 
+        pub let balance: UFix64
+        pub let rewardDebt: Fix64
+        pub let pendingRewards: Fix64 
         init(_ stake: &Stake, farm: &Farm) {
             self.address = stake.lpTokenReceiverCap.address
-            self.totalClaimed = stake.totalClaimed
+            self.balance = stake.lpTokenVault.balance
+            self.rewardDebt = stake.rewardDebt
             self.pendingRewards = farm.getPendingRewards(address: self.address)
         }
     }
@@ -395,10 +436,48 @@ pub contract StakingRewards {
         }
     }
 
-    pub fun createStakingControllerCollection(): @StakeControllerCollection {
-        return <- create StakeControllerCollection()
+     // Admin resource
+    //
+    // only admin can create farms and update pool weights
+    pub resource Admin {
+        pub fun createFarm(poolID: UInt64, weight: UFix64) {
+            pre {
+                weight > 0.0 : "Farm weight must be positive"
+                EmuSwap.getPoolIDs().contains(poolID) : "Pool does not exist on EmuSwap!"
+            }
+            let newFarm <- create Farm(poolID: poolID)
+            let nullResource <- 
+                StakingRewards.farmsByID.insert(key: poolID, <- newFarm)
+            destroy nullResource
+            StakingRewards.farmWeightsByID.insert(key: poolID, weight)
+            StakingRewards.totalWeight = StakingRewards.totalWeight + weight 
+            
+            log( StakingRewards.getFarmInfo(id: poolID) )
+            emit NewFarmCreated(farmID: poolID, weight: weight, totalWeight: StakingRewards.totalWeight)
+        }
+
+        pub fun updateFarmWeight(farmID: UInt64, newWeight: UFix64) {
+            let oldWeight = StakingRewards.farmWeightsByID[farmID]!
+            StakingRewards.farmWeightsByID[farmID] = newWeight
+            StakingRewards.totalWeight = StakingRewards.totalWeight - oldWeight + newWeight
+        }
+
+         // toggles use of mocktime
+        pub fun toggleMockTime() {
+            StakingRewards.mockTime = !StakingRewards.mockTime
+            log("TOGGLING MOCK TIME!")
+            log(StakingRewards.mockTime)
+        }
+
+        // updates mock time by delta (ffwd)
+        pub fun updateMockTimestamp(delta: UFix64) {
+            StakingRewards.mockTimestamp = StakingRewards.mockTimestamp + delta
+            log("new time stamp")
+            log(StakingRewards.mockTimestamp)
+        }
     }
 
+    
     //
     // We do some fancy math here. Basically, any point in time, the amount of Emu Tokens
     // entitled to a user but is pending to be distributed is:
@@ -416,17 +495,25 @@ pub contract StakingRewards {
      // Info of each Farm.
     pub struct FarmInfo {
         pub let id: UInt64;                // ID of LP token.
+        pub let totalStaked: UFix64
+        pub let stakes: {Address: StakeInfo}
         pub let allocPoint: UFix64;         // How many allocation points assigned to this Farm. EmuTokens to distribute per second.
         pub let lastRewardTimestamp: UFix64 // Last timestamp that EmuToken distribution occured
         pub let rewardTokensPerSecond: UFix64 
         pub let totalAccumulatedTokensPerShare: UFix64      // Accumulated EmuTokens per share, times 1e12. See below.
         init(_ farmRef: &Farm) {
             self.id = farmRef.emuSwapPoolID
+            self.totalStaked = farmRef.totalStaked
+            self.stakes = farmRef.readStakes()
             self.allocPoint = StakingRewards.farmWeightsByID[self.id]!
             self.lastRewardTimestamp = farmRef.lastRewardTimestamp
             self.rewardTokensPerSecond = farmRef.rewardTokensPerSecond
             self.totalAccumulatedTokensPerShare = farmRef.totalAccumulatedTokensPerShare
         }        
+    }
+
+    pub fun createStakingControllerCollection(): @StakeControllerCollection {
+        return <- create StakeControllerCollection()
     }
 
     pub fun getFarmInfo(id: UInt64): FarmInfo {
@@ -484,7 +571,7 @@ pub contract StakingRewards {
         var currentEpoch = elapsedTime / epochLength
 
         if currentEpoch > 40.0 {
-            return 0.0
+            return 1.0
         }
 
         var rate = 1.0
@@ -522,17 +609,9 @@ pub contract StakingRewards {
         }
     }
 
-    // toggles use of mocktime
-    pub fun toggleMockTime() {
-        self.mockTime = !self.mockTime
-    }
-
-    // updates mock time by delta (ffwd)
-    pub fun updateMockTimestamp(delta: UFix64) {
-        self.mockTimestamp = self.mockTimestamp + delta
-    }
 
     init() {
+        self.PRECISION = 1.0 // 0.00000001
         self.vault <- self.account.load<@EmuToken.Vault>(from: /storage/liquidityMiningTokens)!
         self.masterRewardVaultByIdentifier <- {} // currently unused... to allow farms to distribute different tokens in the future
         self.rewardsGenesisTimestamp = 0.0

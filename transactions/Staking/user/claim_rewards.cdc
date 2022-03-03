@@ -12,7 +12,7 @@ import StakingRewards from "../../../contracts/StakingRewards.cdc"
 import FlowToken from "../../../contracts/dependencies/FlowToken.cdc"
 import FUSD from "../../../contracts/dependencies/FUSD.cdc"
 
-transaction(amount: UFix64, farmID: UInt64) {
+transaction(farmID: UInt64) {
  
   let stakeControllerCollectionRef: &StakingRewards.StakeControllerCollection
 
@@ -29,7 +29,7 @@ transaction(amount: UFix64, farmID: UInt64) {
     let stakingController = self.stakeControllerCollectionRef.borrow(id: farmID)! as &StakingRewards.StakeController
 
     // sends them to the receiver cap provided when staking.... j00lz maybe only store caps in the stake not in the controller too?
-    farmRef.claimRewards(stakeControllerRef: stakingController, amount: amount)
+    farmRef.claimRewards(stakeControllerRef: stakingController)
   }
 }
 

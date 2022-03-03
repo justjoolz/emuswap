@@ -32,6 +32,12 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
     if signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath) == nil {
       // Create a new Collection and put it in storage
       signer.save(<- EmuSwap.createEmptyCollection(), to: EmuSwap.LPTokensStoragePath)
+      
+      signer.link<&{FungibleTokens.CollectionPublic}>(
+        EmuSwap.LPTokensPublicReceiverPath, 
+        target: EmuSwap.LPTokensStoragePath
+      )
+      let lpTokensReceiverCap = signer.getCapability<&{FungibleTokens.CollectionPublic}>(EmuSwap.LPTokensPublicReceiverPath)
     }
 
     // store reference to LP Tokens Collection

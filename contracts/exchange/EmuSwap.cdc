@@ -397,13 +397,17 @@ pub contract EmuSwap: FungibleTokens {
   pub resource Collection: FungibleTokens.CollectionPublic {
     pub var ownedVaults: @{UInt64: FungibleTokens.TokenVault}
 
+    // Accepts any FungibleTokens and either 
+    // deposits them in appropriate ownedVault 
+    // or adds deposits whole vault if they've not been received before
+    //
     pub fun deposit(token: @FungibleTokens.TokenVault) {
-      if self.ownedVaults[token.tokenID] == nil {
+      if self.ownedVaults[token.tokenID] != nil {
+        self.ownedVaults[token.tokenID]?.deposit!(from: <- token)
+      } else {
         let nullResource <- 
           self.ownedVaults.insert(key: token.tokenID, <- token)
         destroy nullResource
-      } else {
-        self.ownedVaults[token.tokenID]?.deposit!(from: <- token)
       }
     }
 
@@ -415,13 +419,13 @@ pub contract EmuSwap: FungibleTokens {
       return &self.ownedVaults[id] as! &FungibleTokens.TokenVault
     }
 
-      init() {
-        self.ownedVaults <- {}
-      }
+    init() {
+      self.ownedVaults <- {}
+    }
 
-      destroy () {
-        destroy self.ownedVaults
-      }
+    destroy () {
+      destroy self.ownedVaults
+    }
   }
 
   // Admin resource
