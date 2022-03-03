@@ -182,7 +182,7 @@ pub contract StakingRewards {
              */
         }
 
-        // different technique j00lz #untested
+
         // Claim Rewards
         // j00lz todo needs optimizing (repeated call of getPendingRewards)
         // can consider refactoring these 2 functions into the stake resource....
