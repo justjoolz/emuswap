@@ -4,7 +4,7 @@ import FungibleToken from "./dependencies/FungibleToken.cdc"
 // upload a list of addresses that can claim 
 // and the amount they can claim
 // caller sets time limit during which he cannot withdraw the tokens
-// after the time limit expires the claiming ends and the owner can withdraw the tokens
+// after the time limit expires the claiming ends and the owner can withdraw any remaining tokens
 pub contract Airdrop {
 
     // drops by ID 
