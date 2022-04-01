@@ -55,6 +55,13 @@ flow transactions send "./transactions/Staking/admin/toggle_mock_time.cdc" --sig
 flow transactions send "./transactions/Staking/admin/create_new_farm.cdc" 0 --signer "admin-account"
 
 
+
+echo "Create FUSD reward Pool" 
+flow transactions send "./transactions/Staking/admin/create_reward_pool_fusd.cdc" 100000.0 --signer admin-account
+
+
+
+
 flow transactions send "./transactions/Staking/admin/update_mock_timestamp.cdc" 1.0 --signer "admin-account"
 
 
@@ -121,6 +128,12 @@ flow transactions send "./transactions/Staking/admin/update_mock_timestamp.cdc" 
 flow scripts execute "./scripts/Staking/get_farm_meta.cdc" 0
 flow scripts execute "./scripts/Staking/read_stakes_info.cdc" 0 
 
+
+# TokenPaths tricky to pass at the moment :/ can't create for some reason..... 
+
+# flow transactions send "./transactions/Staking/admin/create_reward_pool_fusd.cdc" /storage/fusdVault 0.1 --signer admin-account
+# flow transactions send "./transactions/Staking/admin/create_reward_pool_fusd.cdc" /storage/flowTokenVault 0.1 --signer admin-account
+flow transactions send "./transactions/Staking/admin/create_reward_pool_fusd.cdc" 100000.0 --signer admin-account
 
 
 
