@@ -13,6 +13,6 @@ transaction(poolID: UInt64) {
   }
 
   execute {
-    self.adminRef.createFarm(poolID: poolID, weight: 1.0)
+    self.adminRef.createFarm(poolID: poolID)
   }
 }

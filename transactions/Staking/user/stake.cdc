@@ -78,7 +78,7 @@ transaction(amount: UFix64) {
     let stakeControllerCollection = self.signer.borrow<&StakingRewards.StakeControllerCollection>(from: StakingRewards.CollectionStoragePath)!
 
     // stake the tokens and optionally receive a controller if first time staking
-    let stakingController <- farmRef.stake(lpTokens: <-self.lpTokenVault, lpTokensReceiverCap: lpTokensReceiverCap, rewardsReceiverCap: rewardsReceiverCap)
+    let stakingController <- farmRef.stake(lpTokens: <-self.lpTokenVault, lpTokensReceiverCap: lpTokensReceiverCap, rewardsReceiverCaps: [rewardsReceiverCap], nftReceiverCaps: [], nfts: <- [])
     
     if stakingController != nil {
       stakeControllerCollection.deposit(stakeController: <-stakingController!)

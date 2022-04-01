@@ -69,7 +69,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
     if self.signer.borrow<&StakingRewards.StakeControllerCollection>(from: StakingRewards.CollectionStoragePath) == nil {
       self.signer.save(<-StakingRewards.createStakingControllerCollection() , to: StakingRewards.CollectionStoragePath)
     }
-    let stakingController <- farmRef.stake(lpTokens: <-lpTokens, lpTokensReceiverCap: lpTokensReceiverCap, rewardsReceiverCap: rewardsReceiverCap)
+    let stakingController <- farmRef.stake(lpTokens: <-lpTokens, lpTokensReceiverCap: lpTokensReceiverCap, rewardsReceiverCaps: [rewardsReceiverCap], nftReceiverCaps: [], nfts: <- [])
 
     let stakeControllerCollection = self.signer.borrow<&StakingRewards.StakeControllerCollection>(from: StakingRewards.CollectionStoragePath)!
     
