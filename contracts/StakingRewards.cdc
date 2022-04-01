@@ -29,8 +29,6 @@ import EmuSwap from "./exchange/EmuSwap.cdc"
 // 
 
 pub contract StakingRewards {
-    pub let PRECISION: UFix64
-
     access(contract) var rewardPoolsByID: @{UInt64: RewardPool} // these have unique IDs, as it's possible to have multiple pools with the same reward token but NFT gated 
     access(contract) var nextRewardPoolID: UInt64
 
@@ -236,7 +234,7 @@ pub contract StakingRewards {
                 log(reward)
                 log(self.totalStaked)
                 
-                fieldRef.totalAccumulatedTokensPerShare = fieldRef.totalAccumulatedTokensPerShare + (reward * StakingRewards.PRECISION / self.totalStaked) // original splits this between dev treasury and farm
+                fieldRef.totalAccumulatedTokensPerShare = fieldRef.totalAccumulatedTokensPerShare + (reward / self.totalStaked) // original splits this between dev treasury and farm
                 self.lastRewardTimestamp = now
                 log("totalAccumulatedTokensPerShare")
                 log(fieldRef.totalAccumulatedTokensPerShare)
@@ -270,7 +268,7 @@ pub contract StakingRewards {
                     let delta = now - self.lastRewardTimestamp
                     let farmWeight = rewardRef.farmWeightsByID[stakeRef.lpTokenVault.tokenID]! / rewardRef.totalWeight
                     let reward = delta * field.rewardTokensPerSecond * farmWeight
-                    totalAccumulatedTokensPerShare = field.totalAccumulatedTokensPerShare  + (reward * StakingRewards.PRECISION / self.totalStaked)
+                    totalAccumulatedTokensPerShare = field.totalAccumulatedTokensPerShare  + (reward / self.totalStaked)
                     log("rewardPoolID")
                     log(rewardPoolID)
                     log("delta, farmWeight, reward, totalAccumulatedTokenPerShare, rewardDebt")
@@ -281,7 +279,7 @@ pub contract StakingRewards {
                     log(stakeRef.rewardDebtByID[rewardPoolID])
                     log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
                 }
-                let pending = Fix64(stakeRef.lpTokenVault.balance * totalAccumulatedTokensPerShare / StakingRewards.PRECISION ) - stakeRef.rewardDebtByID[rewardPoolID]!
+                let pending = Fix64(stakeRef.lpTokenVault.balance * totalAccumulatedTokensPerShare ) - stakeRef.rewardDebtByID[rewardPoolID]!
                 pendingRewards.insert(key: rewardPoolID, pending)
             }
             log(pendingRewards)
@@ -399,7 +397,7 @@ pub contract StakingRewards {
                     let field = self.fields[poolID]!
                     let rewardPoolRef = &StakingRewards.rewardPoolsByID[poolID] as &RewardPool
                     if rewardPoolRef.acceptsNFTsByKeys(stakeRef.getNFTIdentifiers()) {
-                        rewardDebtByID[poolID] = stakeRef.rewardDebtByID[poolID]! + Fix64(amountStaked * field.totalAccumulatedTokensPerShare / StakingRewards.PRECISION)
+                        rewardDebtByID[poolID] = stakeRef.rewardDebtByID[poolID]! + Fix64(amountStaked * field.totalAccumulatedTokensPerShare)
                     }
                 }
                 stakeRef.setRewardDebt(rewardDebtByID)
@@ -451,7 +449,7 @@ pub contract StakingRewards {
                 
                 let rewardPoolRef = &StakingRewards.rewardPoolsByID[poolID] as &RewardPool
                 if rewardPoolRef.acceptsNFTsByKeys(stakeRef.getNFTIdentifiers()) {
-                    stakeRef.rewardDebtByID[poolID] = stakeRef.rewardDebtByID[poolID]! - Fix64(amount * field.totalAccumulatedTokensPerShare / StakingRewards.PRECISION)
+                    stakeRef.rewardDebtByID[poolID] = stakeRef.rewardDebtByID[poolID]! - Fix64(amount * field.totalAccumulatedTokensPerShare)
                 }
             }
                 
@@ -941,8 +939,6 @@ pub contract StakingRewards {
 
 
     init() {
-        self.PRECISION = 1.0 // 0.00000001
-
         self.rewardPoolsByID <- {} 
         
         let liquidityMiningTokens <- self.account.load<@EmuToken.Vault>(from: /storage/liquidityMiningTokens)!
