@@ -1,6 +1,6 @@
 import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
-import FlowToken from "../../../contracts/dependencies/FlowToken.cdc"
+import EmuToken from "../../../contracts/EmuToken.cdc"
 import FUSD from "../../../contracts/dependencies/FUSD.cdc"
 import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
 
@@ -9,7 +9,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   let poolID:UInt64
 
   // The Vault references that holds the tokens that are being added as liquidity
-  let flowTokenVaultRef: &FlowToken.Vault
+  let emuTokenVaultRef: &EmuToken.Vault
   let fusdVaultRef: &FUSD.Vault
 
   // reference to lp collection
@@ -20,9 +20,9 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
 
   prepare(signer: AuthAccount) {
     // perhaps function to look this up instead of hard coding
-    self.poolID = 0
+    self.poolID = 1
 
-    self.flowTokenVaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+    self.emuTokenVaultRef = signer.borrow<&EmuToken.Vault>(from: EmuToken.EmuTokenStoragePath)
         ?? panic("Could not borrow a reference to Vault")
 
     self.fusdVaultRef = signer.borrow<&FUSD.Vault>(from: /storage/fusdVault)
@@ -32,12 +32,10 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
     if signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath) == nil {
       // Create a new Collection and put it in storage
       signer.save(<- EmuSwap.createEmptyCollection(), to: EmuSwap.LPTokensStoragePath)
-      
-      signer.link<&{FungibleTokens.CollectionPublic}>(
+      signer.link<&EmuSwap.Collection{FungibleTokens.CollectionPublic}>(
         EmuSwap.LPTokensPublicReceiverPath, 
         target: EmuSwap.LPTokensStoragePath
       )
-      let lpTokensReceiverCap = signer.getCapability<&{FungibleTokens.CollectionPublic}>(EmuSwap.LPTokensPublicReceiverPath)
     }
 
     // store reference to LP Tokens Collection
@@ -56,7 +54,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
 
   execute {
     // Withdraw tokens
-    let token1Vault <- self.flowTokenVaultRef.withdraw(amount: token1Amount) as! @FlowToken.Vault
+    let token1Vault <- self.emuTokenVaultRef.withdraw(amount: token1Amount) as! @EmuToken.Vault
     let token2Vault <- self.fusdVaultRef.withdraw(amount: token2Amount) as! @FUSD.Vault
 
     // create a token bundle with both tokens in equal measure

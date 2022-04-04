@@ -35,10 +35,12 @@
 				"testnet": "0x9a0766d93b6608b7"
 			}
 		},
+		"MetadataViews": "./contracts/dependencies/MetadataViews.cdc",
 		"Test": "./contracts/Test.cdc",
 		"FungibleTokens": "./contracts/dependencies/FungibleTokens.cdc",
 		"EmuSwap": "./contracts/exchange/EmuSwap.cdc",
-		"MetadataViews": "./contracts/dependencies/MetadataViews.cdc"
+		"EmuToken": "./contracts/EmuToken.cdc",
+		"StakingRewards": "./contracts/StakingRewards.cdc"
 	},
 	"networks": {
 		"emulator": "127.0.0.1:3569",
@@ -80,17 +82,21 @@
 				"FungibleTokens"
 			],
 			"admin-account": [
-				"EmuSwap"
+				"EmuSwap",
+				"EmuToken",
+				"StakingRewards"
 			]
 		},
 		"testnet": {
 			"admin-account": [
-				"EmuSwap"
+				"EmuSwap",
+				"EmuToken"
 			]
 		},
 		"mainnet": {
 			"admin-account": [
-				"EmuSwap"
+				"EmuSwap",
+				"EmuToken"
 			]
 		}
 	}

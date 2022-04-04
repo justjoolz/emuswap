@@ -1,6 +1,5 @@
 // create_new_pool.cd 
 //
-// This transaction creates a new Flow/FUSD pool..... 
 
 import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
@@ -26,8 +25,6 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   // reference to lp collection
   let lpCollectionRef: &EmuSwap.Collection
 
-
-  // the signers auth account to pass to execute block
   let signer: AuthAccount
 
   prepare(signer: AuthAccount) {
@@ -47,6 +44,11 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
       // Create a new Collection and put it in storage
       signer.save(<- EmuSwap.createEmptyCollection(), to: EmuSwap.LPTokensStoragePath)
       
+      // Create a public capability to the Collection that only exposes
+      signer.link<&EmuSwap.Collection{FungibleTokens.CollectionPublic}>(
+        EmuSwap.LPTokensPublicReceiverPath,
+        target: EmuSwap.LPTokensStoragePath
+      )
       
     }
     self.lpCollectionRef = signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath)!
@@ -67,9 +69,8 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
 
     // Keep the liquidity provider tokens
     let lpTokens <- self.adminRef.createNewLiquidityPool(from: <- tokenBundle)
-
-    self.adminRef.togglePoolFreeze(id: lpTokens.tokenID)
-  
+    self.adminRef.togglePoolFreeze(id: 0)
+    
     self.lpTokenVault.deposit(from: <-lpTokens )
     self.lpCollectionRef.deposit(token: <- self.lpTokenVault)
     //self.signer.save(<- lpTokens, to: /storage/LPToken)

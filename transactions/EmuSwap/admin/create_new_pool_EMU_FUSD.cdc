@@ -6,15 +6,15 @@ import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
 import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
 
-// hardcoded to create Flow/FUSD pool
-import FlowToken from "../../../contracts/dependencies/FlowToken.cdc"
+// hardcoded to create EMU/FUSD pool
 import FUSD from "../../../contracts/dependencies/FUSD.cdc"
+import EmuToken from "../../../contracts/EmuToken.cdc"
 
 
 transaction(token1Amount: UFix64, token2Amount: UFix64) {
 
   // The Vault references that holds the tokens that are being transferred
-  let flowTokenVaultRef: &FlowToken.Vault
+  let emuTokenVaultRef: &EmuToken.Vault
   let fusdVaultRef: &FUSD.Vault
 
   // EmuSwap Admin Ref
@@ -26,6 +26,8 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   // reference to lp collection
   let lpCollectionRef: &EmuSwap.Collection
 
+  // The Vault reference for liquidity tokens
+  //let liquidityTokenRef: &EmuSwap.Vault
 
   // the signers auth account to pass to execute block
   let signer: AuthAccount
@@ -33,7 +35,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   prepare(signer: AuthAccount) {
     
     // prepare tokens refernces to withdraw inital liquidity 
-    self.flowTokenVaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+    self.emuTokenVaultRef = signer.borrow<&EmuToken.Vault>(from: EmuToken.EmuTokenStoragePath)
         ?? panic("Could not borrow a reference to Vault")
 
     self.fusdVaultRef = signer.borrow<&FUSD.Vault>(from: /storage/fusdVault)
@@ -47,6 +49,11 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
       // Create a new Collection and put it in storage
       signer.save(<- EmuSwap.createEmptyCollection(), to: EmuSwap.LPTokensStoragePath)
       
+      // Create a public capability to the Collection that only exposes
+      signer.link<&EmuSwap.Collection{FungibleTokens.CollectionPublic}>(
+        EmuSwap.LPTokensPublicReceiverPath,
+        target: EmuSwap.LPTokensStoragePath
+      )
       
     }
     self.lpCollectionRef = signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath)!
@@ -59,7 +66,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
 
   execute {
     // Withdraw tokens
-    let token1Vault <- self.flowTokenVaultRef.withdraw(amount: token1Amount) as! @FlowToken.Vault
+    let token1Vault <- self.emuTokenVaultRef.withdraw(amount: token1Amount) as! @EmuToken.Vault
     let token2Vault <- self.fusdVaultRef.withdraw(amount: token2Amount) as! @FUSD.Vault
 
     // Provide liquidity and get liquidity provider tokens
@@ -67,11 +74,9 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
 
     // Keep the liquidity provider tokens
     let lpTokens <- self.adminRef.createNewLiquidityPool(from: <- tokenBundle)
-
     self.adminRef.togglePoolFreeze(id: lpTokens.tokenID)
   
     self.lpTokenVault.deposit(from: <-lpTokens )
     self.lpCollectionRef.deposit(token: <- self.lpTokenVault)
-    //self.signer.save(<- lpTokens, to: /storage/LPToken)
   }
 }

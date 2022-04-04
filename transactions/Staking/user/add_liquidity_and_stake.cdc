@@ -5,6 +5,8 @@
 import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
 import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
+import EmuToken from "../../../contracts/EmuToken.cdc"
+import StakingRewards from "../../../contracts/StakingRewards.cdc"
 
 // hardcoded to create Flow/FUSD pool
 import FlowToken from "../../../contracts/dependencies/FlowToken.cdc"
@@ -17,11 +19,6 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   let flowTokenVaultRef: &FlowToken.Vault
   let fusdVaultRef: &FUSD.Vault
 
-  // EmuSwap Admin Ref
-  let adminRef: &EmuSwap.Admin
-  
-  // new pool to deposit to collection
-  let lpTokenVault: @EmuSwap.TokenVault
 
   // reference to lp collection
   let lpCollectionRef: &EmuSwap.Collection
@@ -39,9 +36,6 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
     self.fusdVaultRef = signer.borrow<&FUSD.Vault>(from: /storage/fusdVault)
         ?? panic("Could not borrow a reference to fusd Vault")
 
-    // Create new Pool Vault 
-    self.lpTokenVault <-EmuSwap.createEmptyTokenVault(tokenID: EmuSwap.nextPoolID) //to: EmuSwap.LPTokensStoragePath
-    
     // check if Collection is created if not then create
     if signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath) == nil {
       // Create a new Collection and put it in storage
@@ -50,9 +44,6 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
       
     }
     self.lpCollectionRef = signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath)!
-
-    self.adminRef = signer.borrow<&EmuSwap.Admin>(from: EmuSwap.AdminStoragePath)
-      ?? panic("Could not borrow a reference to EmuSwap Admin")
 
     self.signer = signer
   }
@@ -65,13 +56,30 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
     // Provide liquidity and get liquidity provider tokens
     let tokenBundle <- EmuSwap.createTokenBundle(fromToken1: <- token1Vault, fromToken2: <- token2Vault)
 
-    // Keep the liquidity provider tokens
-    let lpTokens <- self.adminRef.createNewLiquidityPool(from: <- tokenBundle)
+    let lpTokens <- EmuSwap.borrowPool(id: 0)?.addLiquidity!(from: <- tokenBundle)
 
-    self.adminRef.togglePoolFreeze(id: lpTokens.tokenID)
-  
-    self.lpTokenVault.deposit(from: <-lpTokens )
-    self.lpCollectionRef.deposit(token: <- self.lpTokenVault)
-    //self.signer.save(<- lpTokens, to: /storage/LPToken)
+    // get reference to farm
+    let farmRef = StakingRewards.borrowFarm(id: 0)!
+    
+    // get deposit capabilities for returning lp tokens and rewards 
+    let lpTokensReceiverCap = self.signer.getCapability<&{FungibleTokens.CollectionPublic}>(EmuSwap.LPTokensPublicReceiverPath)
+    let rewardsReceiverCap = self.signer.getCapability<&{FungibleToken.Receiver}>(EmuToken.EmuTokenReceiverPublicPath)
+
+
+    if self.signer.borrow<&StakingRewards.StakeControllerCollection>(from: StakingRewards.CollectionStoragePath) == nil {
+      self.signer.save(<-StakingRewards.createStakingControllerCollection() , to: StakingRewards.CollectionStoragePath)
+    }
+    let stakingController <- farmRef.stake(lpTokens: <-lpTokens, lpTokensReceiverCap: lpTokensReceiverCap, rewardsReceiverCaps: [rewardsReceiverCap], nftReceiverCaps: [], nfts: <- [])
+
+    let stakeControllerCollection = self.signer.borrow<&StakingRewards.StakeControllerCollection>(from: StakingRewards.CollectionStoragePath)!
+    
+    if stakingController != nil {
+      stakeControllerCollection.deposit(stakeController: <-stakingController!)
+    } else {
+      // unreachable
+      destroy stakingController
+    }    
   }
 }
+
+

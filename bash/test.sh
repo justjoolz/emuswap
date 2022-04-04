@@ -21,9 +21,8 @@ flow transactions send "./transactions/demo/mintFlowTokens.cdc" 1000.0 0x01cf0e2
 flow transactions send "./transactions/demo/mintFlowTokens.cdc" 1000.0 0x179b6b1cb6755e31
 flow transactions send "./transactions/demo/mintFlowTokens.cdc" 1000.0 0xf3fcd2c1a78f5eee
 
-# 4. Deploy Project
 
-flow project deploy 
+flow project deploy --network emulator
 
 
 # 3. Setup accounts FUSD.
@@ -32,69 +31,117 @@ flow transactions send "./transactions/FUSD/setup.cdc" --signer "admin-account"
 flow transactions send "./transactions/FUSD/setup.cdc" --signer "user-account1"
 flow transactions send "./transactions/FUSD/setup.cdc" --signer "user-account2"
 
+# Setup EmuToken 
+flow transactions send "./transactions/EmuToken/setup.cdc" --signer "admin-account"
+flow transactions send "./transactions/EmuToken/setup.cdc" --signer "user-account1"
+flow transactions send "./transactions/EmuToken/setup.cdc" --signer "user-account2"
 
-flow transactions send "./transactions/demo/mintFUSD.cdc" 1000.0 0x01cf0e2f2f715450
-flow transactions send "./transactions/demo/mintFUSD.cdc" 1000.0 0x179b6b1cb6755e31
-flow transactions send "./transactions/demo/mintFUSD.cdc" 1000.0 0xf3fcd2c1a78f5eee
 
-
-flow scripts execute "./scripts/get_dao_fee_percentage.cdc"
-flow scripts execute "./scripts/get_lp_fee_percentage.cdc"
-
-flow transactions send "./transactions/EmuSwap/admin/update_lp_fee_percentage.cdc"  0.0025 --signer "admin-account"
-flow transactions send "./transactions/EmuSwap/admin/update_dao_fee_percentage.cdc" 0.0005 --signer "admin-account"
-
+flow transactions send "./transactions/demo/mintFUSD.cdc" 1000000.0 0x01cf0e2f2f715450
+flow transactions send "./transactions/demo/mintFUSD.cdc" 1000000.0 0x179b6b1cb6755e31
+flow transactions send "./transactions/demo/mintFUSD.cdc" 1000000.0 0xf3fcd2c1a78f5eee
 
 # 4. Create Pools (admin adds 10 Flow + 50 FUSD)
 flow transactions send "./transactions/EmuSwap/admin/create_new_pool_FLOW_FUSD.cdc" 100.0 500.0 --signer "admin-account"
 
-
-flow scripts execute "./scripts/get_pool_ids.cdc"
-flow scripts execute "./scripts/get_pool_meta.cdc" 0
-flow scripts execute "./scripts/get_pools_meta.cdc"
-
-# Get quotes 
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
-flow scripts execute "./scripts/pool/get_quote_a_to_exact_b.cdc" 0 1.0
-flow scripts execute "./scripts/pool/get_quote_b_to_exact_a.cdc" 0 1.0
-flow scripts execute "./scripts/pool/get_quote_exact_a_to_b.cdc" 0 1.0
-flow scripts execute "./scripts/pool/get_quote_exact_b_to_a.cdc" 0 1.0
-
-# User 1 Swaps Flow->FUSD
-flow transactions send "./transactions/EmuSwap/exchange/swap_flow_for_fusd.cdc" 1.0 --signer "user-account1"
-flow scripts execute "./scripts/get_pools_meta.cdc" 
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
-
-# User 2 Swaps FUSD->Flow
-flow transactions send "./transactions/EmuSwap/exchange/swap_fusd_for_flow.cdc" 1.0 --signer "user-account2"
-flow scripts execute "./scripts/get_pools_meta.cdc" 
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
-
-# User 1 Swaps Flow->FUSD
-flow transactions send "./transactions/EmuSwap/exchange/swap_flow_for_fusd.cdc" 1.0 --signer "user-account1"
-flow scripts execute "./scripts/get_pools_meta.cdc" 
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
-
-# User 2 Swaps FUSD->Flow
-flow transactions send "./transactions/EmuSwap/exchange/swap_fusd_for_flow.cdc" 1.0 --signer "user-account2"
-flow scripts execute "./scripts/get_pools_meta.cdc" 
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
-
-
-
 # User 1 Adds liquidity
-flow transactions send "./transactions/EmuSwap/exchange/add_liquidity_FLOW_FUSD.cdc" 10.0 5.0 --signer "user-account1"
-flow scripts execute "./scripts/get_pools_meta.cdc" 
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+flow transactions send "./transactions/EmuSwap/exchange/add_liquidity_FLOW_FUSD.cdc" 200.0 1000.0 --signer "user-account1"
 
 # User 2 Adds liquidity
-flow transactions send "./transactions/EmuSwap/exchange/add_liquidity_FLOW_FUSD.cdc" 10.0 5.0 --signer "user-account2"
-flow scripts execute "./scripts/get_pools_meta.cdc" 
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+flow transactions send "./transactions/EmuSwap/exchange/add_liquidity_FLOW_FUSD.cdc" 200.0 1000.0 --signer "user-account2"
 
-# User 2 withdraws some liquidity
-flow transactions send "./transactions/EmuSwap/exchange/remove_liquidity_FLOW_FUSD.cdc" 0.001 --signer "user-account1"
-flow scripts execute "./scripts/pool/get_quotes.cdc" 0 1.0
+# Create new farm for pool 0 = Flow/FUSD
+flow transactions send "./transactions/Staking/admin/toggle_mock_time.cdc" --signer "admin-account"
+flow transactions send "./transactions/Staking/admin/create_new_farm.cdc" 0 --signer "admin-account"
 
-# Read fees collected 
-flow scripts execute "./scripts/read_fees_collected.cdc"
+
+
+echo "Create FUSD reward Pool" 
+flow transactions send "./transactions/Staking/admin/create_reward_pool_fusd.cdc" 100000.0 --signer admin-account
+
+
+
+
+flow transactions send "./transactions/Staking/admin/update_mock_timestamp.cdc" 1.0 --signer "admin-account"
+
+
+echo "USER 1 Stakes 1 "
+
+flow transactions send "./transactions/Staking/user/stake.cdc" 1.0 --signer "user-account1"
+# 60*60*24*27 = 2,332,800
+
+echo "Update Timestamp +100"
+flow transactions send "./transactions/Staking/admin/update_mock_timestamp.cdc" 100.0 --signer "admin-account"
+
+echo "user 1 claims rewards"
+flow transactions send "./transactions/Staking/user/claim_rewards.cdc" 0 --signer "user-account1"
+echo "should have claimed 100 tokens"
+
+echo "user 2 stakes"
+flow transactions send "./transactions/Staking/user/stake.cdc" 1.0 --signer "user-account2"
+
+#echo "user 1 unstakes half"
+#flow transactions send "./transactions/Staking/user/unstake.cdc" 0 0.5 --signer "user-account1"
+
+
+
+flow scripts execute "./scripts/Staking/get_farm_meta.cdc" 0
+flow scripts execute "./scripts/Staking/get_pending_rewards.cdc" 0 0x179b6b1cb6755e31
+
+
+# flow transactions send "./transactions/Staking/user/add_liquidity_and_stake.cdc" 10.0 10.0 --signer "user-account1"
+
+# flow transactions send "./transactions/Staking/user/unstake.cdc" 0 0.001 --signer "user-account1"
+# flow transactions send "./transactions/Staking/user/unstake.cdc" 0 0.001 --signer "user-account2"
+
+#flow scripts execute "./scripts/Staking/get_farm_meta.cdc" 0
+# flow scripts execute "./scripts/Staking/get_pending_rewards.cdc" 0 0x01cf0e2f2f715450
+#flow scripts execute "./scripts/Staking/get_pending_rewards.cdc" 0 0x179b6b1cb6755e31
+#flow scripts execute "./scripts/Staking/get_pending_rewards.cdc" 0 0xf3fcd2c1a78f5eee
+
+
+echo "update timestamp +100"
+flow transactions send "./transactions/Staking/admin/update_mock_timestamp.cdc" 100.0 --signer "admin-account"
+flow scripts execute "./scripts/Staking/get_pending_rewards.cdc" 0 0x179b6b1cb6755e31
+flow scripts execute "./scripts/Staking/get_pending_rewards.cdc" 0 0xf3fcd2c1a78f5eee
+#flow transactions send "./transactions/tick.cdc"
+echo "should be 100 tokens shared between these two"
+
+
+flow scripts execute "./scripts/Staking/get_farm_meta.cdc" 0
+flow scripts execute "./scripts/Staking/read_stakes_info.cdc" 0 
+
+
+# flow transactions send "./transactions/Staking/user/claim_rewards.cdc" 0 --signer "user-account1"
+# flow transactions send "./transactions/Staking/user/claim_rewards.cdc" 0 --signer "user-account2"
+
+flow transactions send "./transactions/Staking/user/claim_rewards.cdc" 0 --signer "user-account1"
+flow transactions send "./transactions/Staking/user/claim_rewards.cdc" 0 --signer "user-account2"
+flow scripts execute "./scripts/Staking/read_stakes_info.cdc" 0 
+
+
+flow transactions send "./transactions/Staking/user/stake.cdc" 1.0 --signer "user-account1"
+
+echo "update timestamp +100"
+flow transactions send "./transactions/Staking/admin/update_mock_timestamp.cdc" 100.0 --signer "admin-account"
+
+flow scripts execute "./scripts/Staking/get_farm_meta.cdc" 0
+flow scripts execute "./scripts/Staking/read_stakes_info.cdc" 0 
+
+
+# TokenPaths tricky to pass at the moment :/ can't create for some reason..... 
+
+# flow transactions send "./transactions/Staking/admin/create_reward_pool_fusd.cdc" /storage/fusdVault 0.1 --signer admin-account
+# flow transactions send "./transactions/Staking/admin/create_reward_pool_fusd.cdc" /storage/flowTokenVault 0.1 --signer admin-account
+flow transactions send "./transactions/Staking/admin/create_reward_pool_fusd.cdc" 100000.0 --signer admin-account
+
+
+
+
+# What IS working....
+# Staking at different times and checking rewards....
+
+# What IS NOT working.....
+# Adding to a stake             FIXED!
+# Withdrawing from stake        
+# Withdrawing rewards
