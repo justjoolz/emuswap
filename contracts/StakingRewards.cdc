@@ -325,10 +325,10 @@ pub contract StakingRewards {
         pub fun unstake(amount: UFix64, stakeControllerRef: &StakeController) {
             pre {
                 stakeControllerRef.farmID == self.emuSwapPoolID : "Incorrect Stake controller for this Farm!"
-                stakeControllerRef.lpTokenReceiverCap.check() : "invalid token receiver cap?!"                                                                                                                                          // j00lz lpTokenReceiver is stored in 2 places... can just store in the stake itself and not in the controller? or vice versa?
+                stakeControllerRef.getLPTokenReceiverCap().check() : "invalid token receiver capability!"                                                                                                                                          // j00lz lpTokenReceiver is stored in 2 places... can just store in the stake itself and not in the controller? or vice versa?
             }
 
-            let address = stakeControllerRef.lpTokenReceiverCap.address 
+            let address = stakeControllerRef.getLPTokenReceiverCap().address 
             assert( amount <= self.stakes[address]?.lpTokenVault?.balance!, message: "Insufficient LP Tokens available to withdraw. ".concat(
                 amount.toString()).concat(" ").concat( 
                     (self.stakes[address]?.lpTokenVault?.balance!).toString()))
@@ -345,7 +345,7 @@ pub contract StakingRewards {
             }
             
             // Withdraw requested amount of LP Tokens and return to the user
-            let receiverRef = stakeControllerRef.lpTokenReceiverCap.borrow()
+            let receiverRef = stakeControllerRef.getLPTokenReceiverCap().borrow()
             let tokens <- stakeRef.lpTokenVault.withdraw(amount: amount)
             receiverRef?.deposit!(from: <- tokens)
 
@@ -522,11 +522,14 @@ pub contract StakingRewards {
             return stakeRef
         }
 
-        init(id: UInt64, lpTokenReceiverCap: Capability<&{FungibleTokens.CollectionPublic}>, rewardsReceiverCaps: [Capability<&{FungibleToken.Receiver}>]) {
-            self.farmID = id
-            self.lpTokenReceiverCap = lpTokenReceiverCap
-            self.rewardsReceiverCaps = rewardsReceiverCaps
-            self.accessNFTsAccepted = StakingRewards.farmsByID[id]?.accessNFTsAccepted!
+
+        pub fun getLPTokenReceiverCap(): Capability<&AnyResource{FungibleTokens.CollectionPublic}> {
+            return self.borrowStake().lpTokenReceiverCap
+        }
+
+        pub fun addRewardReceiverCap(id: UInt64, capability: Capability<&AnyResource{FungibleToken.Receiver}>) {
+            let stakeRef = self.borrowStake()
+            stakeRef.rewardsReceiverCaps[id] = capability
         }
 
     }
