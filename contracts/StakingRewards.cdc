@@ -282,7 +282,7 @@ pub contract StakingRewards {
                 emit TokensStaked(address: lpTokensReceiverCap.address, amountStaked: amountStaked, totalStaked: self.totalStaked)
 
                 // return stake controller for user to access their tokens
-                return <- create StakeController(id: id, lpTokenReceiverCap: lpTokensReceiverCap, rewardsReceiverCaps: rewardsReceiverCaps) // id needs to be unique per user and per Farm
+                return <- create StakeController(id: id) // id needs to be unique per user and per Farm
             } 
 
             else { // user already has an existing stake in this farm
@@ -293,7 +293,7 @@ pub contract StakingRewards {
                 // deposit nfts
                 while nfts.length > 0 {
                     let nft <- nfts.removeFirst()
-                    assert(stakeRef.nfts[nft.getType().identifier] == nil, message: "Duplicate NFT type detected, only 1 nft per collection can be staked.")
+                    assert(stakeRef.nfts[nft.getType().identifier] == nil, message: "Duplicate NFT type detected, only 1 nft per collection required.")
                     stakeRef.nfts[nft.getType().identifier] <-! nft
                 }
                 destroy nfts // empty :)
@@ -506,10 +506,9 @@ pub contract StakingRewards {
     pub resource StakeController {
         pub let farmID: UInt64
 
-        pub let accessNFTsAccepted: [String] // array of fully qualified identifiers of accepted booster NFTs
-
-        pub let lpTokenReceiverCap: Capability<&{FungibleTokens.CollectionPublic}>
-        pub let rewardsReceiverCaps: [Capability<&{FungibleToken.Receiver}>]
+        init(id: UInt64) {
+            self.farmID = id
+        }
 
         // borrow stake function
         //
@@ -522,6 +521,17 @@ pub contract StakingRewards {
             return stakeRef
         }
 
+        pub fun getAccessNFTsAccepted(): [String] {
+            return StakingRewards.farmsByID[self.farmID]?.accessNFTsAccepted!
+        }
+
+        pub fun stakeNFT(nft: @NonFungibleToken.NFT) {
+            self.borrowStake().depositNFT(nft: <- nft)
+        }
+
+        pub fun unstakeNFT(identifier: String): @NonFungibleToken.NFT {
+            return <- self.borrowStake().withdrawNFT(identifier: identifier)!
+        }
 
         pub fun getLPTokenReceiverCap(): Capability<&AnyResource{FungibleTokens.CollectionPublic}> {
             return self.borrowStake().lpTokenReceiverCap
