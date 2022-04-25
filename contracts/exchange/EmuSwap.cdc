@@ -62,8 +62,8 @@ pub contract EmuSwap: FungibleTokens {
     pub event TokensBurned(tokenID: UInt64, amount: UFix64)
 
     // Event that is emitted when trading fee is updated
-    pub event LPFeeUpdated(feePercentage: UFix64)
-    pub event DAOFeeUpdated(feePercentage: UFix64)
+    pub event LPFeeUpdated(poolID: UInt64, feePercentage: UFix64)
+    pub event DAOFeeUpdated(poolID: UInt64, feePercentage: UFix64)
 
     // j00lz can make this event more specific from: and to: with amounts and Type.identifier or maybe poolID
     pub event Trade(token1Amount: UFix64, token2Amount: UFix64, side: UInt8)
@@ -93,6 +93,31 @@ pub contract EmuSwap: FungibleTokens {
         // Token Vaults
         access(contract) var token1Vault: @FungibleToken.Vault?
         access(contract) var token2Vault: @FungibleToken.Vault?
+
+        access(contract) var DAOFeePercentage: UFix64
+        access(contract) var LPFeePercentage: UFix64
+
+        // Pool Initalization
+        //
+        init(DAOFeePercentage: UFix64, LPFeePercentage: UFix64) {
+            self.isFrozen = true // frozen until admin unfreezes
+            self.token1Vault <- nil
+            self.token2Vault <- nil
+
+            self.ID = EmuSwap.nextPoolID
+            self.DAOFeePercentage = DAOFeePercentage
+            self.LPFeePercentage = LPFeePercentage
+            
+            // Emit an event that shows that the contract was initialized
+            emit TokensInitialized(tokenID: self.ID)
+            ///emit TokensInitialized(tokenID: self.ID, tokenName: tokenName, tokenSymbol: tokenSymbol, initialSupply: EmuSwap.totalSupplyByID[self.ID]!)
+        }
+
+        destroy() {
+            // j00lz add safety mechanism
+            destroy self.token1Vault
+            destroy self.token2Vault
+        }
 
         // Get Pool Meta
         //
@@ -165,12 +190,12 @@ pub contract EmuSwap: FungibleTokens {
             let originalBalance = from.balance
 
             // Withdraw DAO fee from input tokens.
-            let fees <- from.withdraw(amount: from.balance * EmuSwap.DAOFeePercentage)
+            let fees <- from.withdraw(amount: from.balance * self.DAOFeePercentage)
             EmuSwap.storeFees(fees: <-fees)
 
             // Calculate amount from pricing curve
             // A fee portion is taken from the input
-            let token1Amount = originalBalance * (1.0 - EmuSwap.LPFeePercentage - EmuSwap.DAOFeePercentage)
+            let token1Amount = originalBalance * (1.0 - self.LPFeePercentage - self.DAOFeePercentage)
             let token2Amount = self.quoteSwapExactToken1ForToken2(amount: token1Amount)
 
             assert(token2Amount > 0.0, message: "Exchanged amount too small")
@@ -193,12 +218,12 @@ pub contract EmuSwap: FungibleTokens {
             let originalBalance = from.balance
 
             // Withdraw DAO fee from input tokens.
-            let fees <- from.withdraw(amount: from.balance * EmuSwap.DAOFeePercentage)
+            let fees <- from.withdraw(amount: from.balance * self.DAOFeePercentage)
             EmuSwap.storeFees(fees: <-fees)
 
             // Calculate amount from pricing curve
             // A fee portion is taken from the final amount
-            let token2Amount = originalBalance * (1.0 - EmuSwap.LPFeePercentage - EmuSwap.DAOFeePercentage)
+            let token2Amount = originalBalance * (1.0 - self.LPFeePercentage - self.DAOFeePercentage)
             let token1Amount = self.quoteSwapExactToken2ForToken1(amount: token2Amount)
 
             assert(token1Amount > 0.0, message: "Exchanged amount too small")
@@ -295,24 +320,12 @@ pub contract EmuSwap: FungibleTokens {
             self.isFrozen = !self.isFrozen
         }
 
-        // Pool Initalization
-        //
-        init() {
-            self.isFrozen = true // frozen until admin unfreezes
-            self.token1Vault <- nil
-            self.token2Vault <- nil
-
-            self.ID = EmuSwap.nextPoolID
-            
-            // Emit an event that shows that the contract was initialized
-            emit TokensInitialized(tokenID: self.ID)
-            ///emit TokensInitialized(tokenID: self.ID, tokenName: tokenName, tokenSymbol: tokenSymbol, initialSupply: EmuSwap.totalSupplyByID[self.ID]!)
+        access(contract) fun setDAOFeePercentage(_ feePercentage: UFix64) {
+            self.DAOFeePercentage = feePercentage
         }
-
-        destroy() {
-            // j00lz add safety mechanism
-            destroy self.token1Vault
-            destroy self.token2Vault
+        
+        access(contract) fun setLPFeePercentage(_ feePercentage: UFix64) {
+            self.LPFeePercentage = feePercentage
         }
     }
 
@@ -399,7 +412,7 @@ pub contract EmuSwap: FungibleTokens {
 
         // Accepts any FungibleTokens and either 
         // deposits them in appropriate ownedVault 
-        // or adds deposits whole vault if they've not been received before
+        // or deposits whole vault if they've not been received before
         //
         pub fun deposit(token: @FungibleTokens.TokenVault) {
             if self.ownedVaults[token.tokenID] != nil {
@@ -435,7 +448,7 @@ pub contract EmuSwap: FungibleTokens {
 
         pub fun createNewLiquidityPool(from: @EmuSwap.TokenBundle): @EmuSwap.TokenVault {
             // create new pool
-            let newPool <- create Pool()
+            let newPool <- create Pool(DAOFeePercentage: EmuSwap.DAOFeePercentage, LPFeePercentage: EmuSwap.LPFeePercentage)
             
             // drop liquidity in
             newPool.donateLiquidity(from: <- from)
@@ -455,14 +468,16 @@ pub contract EmuSwap: FungibleTokens {
             return <- lpTokens
         }
 
-        pub fun updateLPFeePercentage(feePercentage: UFix64) {
-            EmuSwap.LPFeePercentage = feePercentage
-            emit LPFeeUpdated(feePercentage: feePercentage)
+        pub fun updateLPFeePercentage(id: UInt64, feePercentage: UFix64) {
+            let poolRef = &EmuSwap.poolsByID[id] as &Pool
+            poolRef.setLPFeePercentage(feePercentage)
+            emit LPFeeUpdated(poolID: id, feePercentage: feePercentage)
         }
         
-        pub fun updateDAOFeePercentage(feePercentage: UFix64) {
-            EmuSwap.DAOFeePercentage = feePercentage
-            emit DAOFeeUpdated(feePercentage: feePercentage)
+        pub fun updateDAOFeePercentage(id: UInt64, feePercentage: UFix64) {
+            let poolRef = &EmuSwap.poolsByID[id] as &Pool
+            poolRef.setDAOFeePercentage(feePercentage)
+            emit DAOFeeUpdated(poolID: id, feePercentage: feePercentage)
         }
 
         pub fun togglePoolFreeze(id: UInt64) {
@@ -566,7 +581,7 @@ pub contract EmuSwap: FungibleTokens {
     access(contract) fun storeFees(fees: @FungibleToken.Vault) {
         let identifier = fees.getType().identifier
         let amount = fees.balance
-        // check if fees of this token type have been collected
+        // check if fees of this token type have already been collected
         if EmuSwap.feesByIdentifier[identifier] != nil {
             EmuSwap.feesByIdentifier[identifier]?.deposit!(from: <-fees)
         } else { // first times fees of this type collected
@@ -607,6 +622,7 @@ pub contract EmuSwap: FungibleTokens {
         self.poolsByID <- {}
         self.nextPoolID = 0
         
+        // defaults for new pools
         self.LPFeePercentage  = 0.0025 // 0.25%
         self.DAOFeePercentage = 0.0005 // 0.05%
         self.feesByIdentifier <- {}
