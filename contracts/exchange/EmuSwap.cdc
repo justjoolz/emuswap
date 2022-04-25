@@ -405,9 +405,7 @@ pub contract EmuSwap: FungibleTokens {
             if self.ownedVaults[token.tokenID] != nil {
                 self.ownedVaults[token.tokenID]?.deposit!(from: <- token)
             } else {
-                let nullResource <- 
-                self.ownedVaults.insert(key: token.tokenID, <- token)
-                destroy nullResource
+                self.ownedVaults[token.tokenID] <-! token
             }
         }
 
