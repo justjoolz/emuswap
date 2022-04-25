@@ -22,9 +22,7 @@ pub contract Airdrop {
         let drop <- create Drop(tokens: <- tokens, startTime: startTime, duration: duration, nftReceiverCap: nftReceiverCap)
 
         // insert in dictionary
-        let nullResource
-            <- self.drops.insert(key: self.nextDropID, <- drop)
-        destroy nullResource
+        self.drops[self.nextDropID] <-! drop
 
         // create controller resource
         let dropController <- create DropController(id: self.nextDropID)
