@@ -39,6 +39,7 @@
 		"Test": "./contracts/Test.cdc",
 		"FungibleTokens": "./contracts/dependencies/FungibleTokens.cdc",
 		"EmuSwap": "./contracts/exchange/EmuSwap.cdc",
+		"xEmuToken": "./contracts/xEmuToken.cdc",
 		"EmuToken": "./contracts/EmuToken.cdc",
 		"StakingRewards": "./contracts/StakingRewards.cdc"
 	},
@@ -84,19 +85,24 @@
 			"admin-account": [
 				"EmuSwap",
 				"EmuToken",
+				"xEmuToken",
 				"StakingRewards"
 			]
 		},
 		"testnet": {
 			"admin-account": [
 				"EmuSwap",
-				"EmuToken"
+				"EmuToken",
+				"xEmuToken",
+				"StakingRewards"
 			]
 		},
 		"mainnet": {
 			"admin-account": [
 				"EmuSwap",
-				"EmuToken"
+				"EmuToken",
+				"xEmuToken",
+				"StakingRewards"
 			]
 		}
 	}
