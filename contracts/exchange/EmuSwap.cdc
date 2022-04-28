@@ -135,44 +135,44 @@ pub contract EmuSwap: FungibleTokens {
         //
         // Get quote for Token1 (given) -> Token2
         pub fun quoteSwapExactToken1ForToken2(amount: UFix64): UFix64 {
-            let PoolMeta = self.getPoolMeta()
+            let poolMeta = self.getPoolMeta()
 
             // token1Amount * token2Amount = token1Amount' * token2Amount' = (token1Amount + amount) * (token2Amount - quote)
-            let quote = PoolMeta.token2Amount * amount / (PoolMeta.token1Amount + amount);
+            let quote = poolMeta.token2Amount * amount / (poolMeta.token1Amount + amount);
 
             return quote
         }
 
         // Get quote for Token1 -> Token2 (given)
         pub fun quoteSwapToken1ForExactToken2(amount: UFix64): UFix64 {
-            let PoolMeta = self.getPoolMeta()
+            let poolMeta = self.getPoolMeta()
 
-            assert(PoolMeta.token2Amount > amount, message: "Not enough Token2 in the pool")
+            assert(poolMeta.token2Amount > amount, message: "Not enough Token2 in the pool")
 
             // token1Amount * token2Amount = token1Amount' * token2Amount' = (token1Amount + quote) * (token2Amount - amount)
-            let quote = PoolMeta.token1Amount * amount / (PoolMeta.token2Amount - amount);
+            let quote = poolMeta.token1Amount * amount / (poolMeta.token2Amount - amount);
 
             return quote
         }
 
         // Get quote for Token2 (given) -> Token1
         pub fun quoteSwapExactToken2ForToken1(amount: UFix64): UFix64 {
-            let PoolMeta = self.getPoolMeta()
+            let poolMeta = self.getPoolMeta()
 
             // token1Amount * token2Amount = token1Amount' * token2Amount' = (token2Amount + amount) * (token1Amount - quote)
-            let quote = PoolMeta.token1Amount * amount / (PoolMeta.token2Amount + amount);
+            let quote = poolMeta.token1Amount * amount / (poolMeta.token2Amount + amount);
 
             return quote
         }
 
         // Get quote for Token2 -> Token1 (given)
         pub fun quoteSwapToken2ForExactToken1(amount: UFix64): UFix64 {
-            let PoolMeta = self.getPoolMeta()
+            let poolMeta = self.getPoolMeta()
 
-            assert(PoolMeta.token1Amount > amount, message: "Not enough Token1 in the pool")
+            assert(poolMeta.token1Amount > amount, message: "Not enough Token1 in the pool")
 
             // token1Amount * token2Amount = token1Amount' * token2Amount' = (token2Amount + quote) * (token1Amount - amount)
-            let quote = PoolMeta.token2Amount * amount / (PoolMeta.token1Amount - amount);
+            let quote = poolMeta.token2Amount * amount / (poolMeta.token1Amount - amount);
 
             return quote
         }
