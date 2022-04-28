@@ -9,6 +9,7 @@
 
 import FungibleToken from "../dependencies/FungibleToken.cdc"
 import FungibleTokens from "../dependencies/FungibleTokens.cdc"
+import MetadataViews from "../dependencies/MetadataViews.cdc"
 
 pub contract EmuSwap: FungibleTokens {
   
@@ -84,7 +85,7 @@ pub contract EmuSwap: FungibleTokens {
     // Main resource type created for each swap pool
     // Stored in a field the contract indexed by ID   
     //
-    pub resource Pool {
+    pub resource Pool: MetadataViews.Resolver {
         pub let ID: UInt64
 
         // Frozen flag controlled by Admin
@@ -327,12 +328,33 @@ pub contract EmuSwap: FungibleTokens {
         access(contract) fun setLPFeePercentage(_ feePercentage: UFix64) {
             self.LPFeePercentage = feePercentage
         }
+
+        pub fun getViews(): [Type] {
+            return [
+                Type<MetadataViews.Display>()
+            ]
+        }
+        pub fun resolveView(_ view: Type): AnyStruct? {
+           let metadata = self.getPoolMeta()
+           switch view {
+               case Type<MetadataViews.Display>():
+                return MetadataViews.Display(
+                    name: metadata.token1Identifier.concat(":").concat(metadata.token2Identifier),
+                    description: "Description of this pool",
+                    thumbnail: MetadataViews.HTTPFile(
+                        url: "//Thumbnail.jpg"
+                    )
+                )
+           }
+           return nil
+        }
+
     }
 
     // TokenVault
     //
     // The LP Tokens that are issued are stored in TokenVaults
-    pub resource TokenVault: FungibleTokens.Provider, FungibleTokens.Receiver, FungibleTokens.Balance {
+    pub resource TokenVault: FungibleTokens.Provider, FungibleTokens.Receiver, FungibleTokens.Balance, MetadataViews.Resolver {
 
         // holds the balance of a users tokens
         pub var balance: UFix64
@@ -360,6 +382,27 @@ pub contract EmuSwap: FungibleTokens {
             emit TokensDeposited(tokenID: self.tokenID, amount: vault.balance, to: self.owner?.address)
             vault.balance = 0.0
             destroy vault
+        }
+
+        pub fun getViews(): [Type] {
+            return [
+                Type<MetadataViews.Display>()
+            ]
+        }
+
+        pub fun resolveView(_ view: Type): AnyStruct? {
+            let meta = EmuSwap.borrowPool(id: self.tokenID)!.getPoolMeta()
+            switch view {
+                case Type<MetadataViews.Display>():
+                    return MetadataViews.Display(
+                        name: meta.token1Identifier.concat(":").concat(meta.token2Identifier),
+                        description: "Description of this LPToken",
+                        thumbnail: MetadataViews.HTTPFile(
+                            url: "//LPTokenThumbnail.jpg"
+                        )
+                    )
+           }
+           return nil
         }
 
         destroy() {
@@ -407,7 +450,7 @@ pub contract EmuSwap: FungibleTokens {
     // Stored in users storage
     // and contains their LP Token Vaults
     //
-    pub resource Collection: FungibleTokens.CollectionPublic {
+    pub resource Collection: FungibleTokens.CollectionPublic, MetadataViews.ResolverCollection {
         pub var ownedVaults: @{UInt64: FungibleTokens.TokenVault}
 
         // Accepts any FungibleTokens and either 
@@ -421,6 +464,13 @@ pub contract EmuSwap: FungibleTokens {
                 self.ownedVaults[token.tokenID] <-! token
             }
         }
+
+        pub fun borrowViewResolver(id: UInt64): &{MetadataViews.Resolver} {
+            let vault = &self.ownedVaults[id] as auth &FungibleTokens.TokenVault
+            let emuSwapVault = vault as! &EmuSwap.TokenVault
+            return emuSwapVault as &{MetadataViews.Resolver} 
+        }
+
 
         pub fun getIDs(): [UInt64] {
             return self.ownedVaults.keys
