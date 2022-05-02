@@ -18,7 +18,7 @@ transaction(farmID: UInt64) {
 
   prepare(signer: AuthAccount) {
     // get stake controller collection ref 
-    self.stakeControllerCollectionRef = signer.borrow<&StakingRewards.StakeControllerCollection>(from: StakingRewards.CollectionStoragePath)!
+    self.stakeControllerCollectionRef = signer.borrow<&StakingRewards.StakeControllerCollection>(from: StakingRewards.CollectionStoragePath) ?? panic("Staking Rewards Controller Collection not found in users account")
   }
 
   execute {

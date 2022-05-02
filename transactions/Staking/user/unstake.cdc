@@ -25,8 +25,8 @@ transaction(id: UInt64, amount: UFix64) {
   execute {
     let farmRef = StakingRewards.borrowFarm(id: 0)!
 
-    let collectionRef = self.signer.borrow<&StakingRewards.StakeControllerCollection>(from: StakingRewards.CollectionStoragePath)
-    let stakeControllerRef = collectionRef!.borrow(id: id)!
+    let collectionRef = self.signer.borrow<&StakingRewards.StakeControllerCollection>(from: StakingRewards.CollectionStoragePath) ?? panic("could not borrow staking collection")
+    let stakeControllerRef = collectionRef.borrow(id: id)!
 
     farmRef.unstake(amount: amount, stakeControllerRef: stakeControllerRef) 
   }
