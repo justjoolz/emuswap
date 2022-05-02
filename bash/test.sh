@@ -43,6 +43,12 @@ flow transactions send "./transactions/demo/mintFUSD.cdc" 1000000.0 0xf3fcd2c1a7
 
 # 4. Create Pools (admin adds 10 Flow + 50 FUSD)
 flow transactions send "./transactions/EmuSwap/admin/create_new_pool_FLOW_FUSD.cdc" 100.0 500.0 --signer "admin-account"
+# Pool already exists 
+flow transactions send "./transactions/EmuSwap/admin/create_new_pool_FLOW_FUSD.cdc" 100.0 500.0 --signer "admin-account"
+
+
+# Create Emu FUSD pool
+flow transactions send "./transactions/EmuSwap/admin/create_new_pool_EMU_FUSD.cdc" 1.0 5.0 --signer "admin-account"
 
 # User 1 Adds liquidity
 flow transactions send "./transactions/EmuSwap/exchange/add_liquidity_FLOW_FUSD.cdc" 200.0 1000.0 --signer "user-account1"
