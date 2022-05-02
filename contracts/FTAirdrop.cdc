@@ -65,10 +65,11 @@ pub contract Airdrop {
 
     // Claim Drop Function 
     //
-    // Claims an amount for the address of the ft receiver cap provided 
+    // Claims full amount available for the address of the ft receiver cap provided 
     //
-    pub fun claimDrop(dropID: UInt64, amount: UFix64, ftReceiverCap: Capability<&{FungibleToken.Receiver}>) {
+    pub fun claimDrop(dropID: UInt64, ftReceiverCap: Capability<&{FungibleToken.Receiver}>) {
         let dropRef = &self.drops[dropID] as &Drop
+        let amount = dropRef.availableToClaimByAddress[ftReceiverCap.address]!
         dropRef.claim(amount: amount, ftReceiverCap: ftReceiverCap)
         emit DropClaimed(id: dropID, address: ftReceiverCap.address, amount: amount)
     }
@@ -88,6 +89,7 @@ pub contract Airdrop {
             let claimAddress = ftReceiverCap.address
             let receiverRef = ftReceiverCap.borrow()
             receiverRef?.deposit(from: <- self.vault.withdraw(amount: amount))
+            self.availableToClaimByAddress[ftReceiverCap.address] = self.availableToClaimByAddress[ftReceiverCap.address]! - amount
         }
 
         pub fun totalClaims(): UFix64 {
