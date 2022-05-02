@@ -637,8 +637,8 @@ pub contract StakingRewards {
         pub let totalStaked: UFix64
         pub let lastRewardTimestamp: UFix64
         pub let farmWeightsByID: {UInt64: UFix64}
-        pub let rewardTokensPerSecondByID: {UInt64: UFix64} 
-        pub let totalAccumulatedTokensPerShareByID: {UInt64: UFix64} 
+        pub let rewardTokensPerSecondByID: {UInt64: UFix64}
+        pub let totalAccumulatedTokensPerShareByID: {UInt64: UFix64}
 
         init(_ farmRef: &Farm) {
             self.id = farmRef.emuSwapPoolID
@@ -771,8 +771,8 @@ pub contract StakingRewards {
         self.AdminStoragePath = /storage/EmuStakingRewardsAdmin
         self.CollectionStoragePath = /storage/EmuStakingRewardsCollection
 
-        let admin <- create Admin()
-        self.account.save(<-admin, to: self.AdminStoragePath)
+        destroy self.account.load<@AnyResource>(from: self.AdminStoragePath)
+        self.account.save(<-create Admin(), to: self.AdminStoragePath)
 
         self.mockTime = false
         self.mockTimestamp = 0.0
