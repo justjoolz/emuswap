@@ -653,7 +653,7 @@ pub contract StakingRewards {
                 let rewardPoolRef = &StakingRewards.rewardPoolsByID[poolID] as &RewardPool
                 self.farmWeightsByID[poolID] = rewardPoolRef.farmWeightsByID[self.id]!
                 self.rewardTokensPerSecondByID[poolID] = rewardPoolRef.emissionDetails.getCurrentEmissionRate(genesisTS: rewardPoolRef.rewardsGenesisTimestamp)
-                self.totalAccumulatedTokensPerShareByID[poolID] = self.totalAccumulatedTokensPerShareByID[poolID]!
+                self.totalAccumulatedTokensPerShareByID[poolID] = farmRef.totalAccumulatedTokensPerShareByRewardPoolID[poolID]
             }
         }        
     }
