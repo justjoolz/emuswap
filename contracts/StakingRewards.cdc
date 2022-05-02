@@ -191,9 +191,10 @@ pub contract StakingRewards {
         // To be called by front end UI and used in metadata
         //
         pub fun getPendingRewards(address: Address): {UInt64: Fix64} {
+            if self.stakes[address] == nil { return {} }
+            let stakeRef = &self.stakes[address] as &Stake
             let pendingRewards: {UInt64: Fix64} = {}
             let now = StakingRewards.now()
-            let stakeRef = &self.stakes[address] as &Stake
 
             for rewardPoolID in self.totalAccumulatedTokensPerShareByRewardPoolID.keys {
                 let rewardRef = &StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool
@@ -354,12 +355,13 @@ pub contract StakingRewards {
                 let accumulatedTokens = stakeRef.lpTokenVault.balance * self.totalAccumulatedTokensPerShareByRewardPoolID[poolID]!
                 let pending = Fix64(accumulatedTokens) - stakeRef.rewardDebtByID[poolID]!
 
-                if stakeRef.rewardsReceiverCaps[poolID] != nil { // user has provided the correct receiver already... if there is a new reward pool added the user will need to setup and provide a new matching receiver to claim 
+                if stakeRef.rewardsReceiverCaps[poolID]?.borrow() != nil { // user has provided the correct receiver already... if there is a new reward pool added the user will need to setup and provide a new matching receiver to claim 
                     // update reward debt
                     stakeRef.rewardDebtByID[poolID] = Fix64(accumulatedTokens)
                     // distribute pending
                     let rewards <- StakingRewards.rewardPoolsByID[poolID]?.vault?.withdraw(amount: UFix64(pending))!
                     let rewardTokenType = rewards.getType().identifier
+
                     stakeRef.rewardsReceiverCaps[poolID]?.borrow()!!.deposit(from: <-rewards)
                     emit RewardsClaimed(address: stakeRef.rewardsReceiverCaps[0]!.address, tokenType: rewardTokenType, amountClaimed: UFix64(pending), rewardDebt: stakeRef.rewardDebtByID[poolID]!, totalRemaining: StakingRewards.rewardPoolsByID[poolID]?.vault?.balance!)
                 } 
