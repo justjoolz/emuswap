@@ -15,6 +15,9 @@ pub contract EmuSwap: FungibleTokens {
   
     // Pools kept here and only accessible via the contract (could make account to allow for future ideas?)
     access(contract) var poolsByID: @{UInt64: Pool}
+
+    // Map of Token Identifier (A.Vault)
+    access(contract) var poolsMap: {String: {String: UInt64}}
   
     // Total supply of liquidity tokens in existence
     access(contract) var totalSupplyByID: {UInt64: UFix64}
@@ -439,6 +442,14 @@ pub contract EmuSwap: FungibleTokens {
             return <- self.token2.withdraw(amount: self.token2.balance)
         }
 
+        // returns identifiers with ".Vault" from "A.f8d6e0586b0a20c7.FUSD.Vault"
+        pub fun getIdentifiers(): [String] {
+            let ids = [self.token1.getType().identifier, self.token2.getType().identifier]
+            ids[0] = ids[0].slice(from: 0, upTo: ids[0].length - 6)
+            ids[1] = ids[1].slice(from: 0, upTo: ids[1].length - 6)
+            return ids
+        }
+
         destroy() {
             destroy self.token1
             destroy self.token2
@@ -497,6 +508,12 @@ pub contract EmuSwap: FungibleTokens {
     pub resource Admin {
 
         pub fun createNewLiquidityPool(from: @EmuSwap.TokenBundle): @EmuSwap.TokenVault {
+            let token1 = from.getIdentifiers()[0]
+            let token2 = from.getIdentifiers()[1]
+
+            assert(token1 != token2, message: "Cannot create pool with identical tokens!")
+            assert(EmuSwap.getPoolIDFromIdentifiers(token1: token1, token2: token2) == nil, message: "Pool already exists")
+            
             // create new pool
             let newPool <- create Pool(DAOFeePercentage: EmuSwap.DAOFeePercentage, LPFeePercentage: EmuSwap.LPFeePercentage)
             
@@ -505,6 +522,16 @@ pub contract EmuSwap: FungibleTokens {
 
             // Add new Pool to dictionary
             EmuSwap.poolsByID[EmuSwap.nextPoolID] <-! newPool
+
+            // Update poolMap
+            if EmuSwap.poolsMap[token1] == nil {
+                EmuSwap.poolsMap[token1] = {}
+            }
+            if EmuSwap.poolsMap[token2] == nil {
+                EmuSwap.poolsMap[token2] = {}
+            }
+            EmuSwap.poolsMap[token1]!.insert(key: token2, EmuSwap.nextPoolID)
+            EmuSwap.poolsMap[token2]!.insert(key: token1, EmuSwap.nextPoolID)
 
             // Create initial tokens
             let lpTokens <- EmuSwap.mintTokens(tokenID: EmuSwap.nextPoolID, amount: 1.0)
@@ -567,6 +594,25 @@ pub contract EmuSwap: FungibleTokens {
 
     pub fun getPoolIDs(): [UInt64] {
         return EmuSwap.poolsByID.keys
+    }
+
+    pub fun getSwapsAvailableForToken(identifier: String): {String: UInt64}? {
+        return self.poolsMap[identifier]
+    }
+
+    pub fun getAllRoutes(): {String: {String: UInt64}} {
+        return self.poolsMap
+    }
+
+    pub fun getPoolIDFromIdentifiers(token1: String, token2: String): UInt64? {
+        let token1ToToken2Exists = EmuSwap.poolsMap.containsKey(token1) && EmuSwap.poolsMap[token1]!.containsKey(token2) 
+        let token2ToToken1Exists = EmuSwap.poolsMap.containsKey(token2) && EmuSwap.poolsMap[token2]!.containsKey(token1) 
+
+        if token1ToToken2Exists && token2ToToken1Exists {
+            return self.poolsMap[token1]![token2]!
+        } else {
+            return nil
+        }
     }
 
     // j00lz todo add these to metadata format... 
@@ -670,6 +716,7 @@ pub contract EmuSwap: FungibleTokens {
     init() {
         self.totalSupplyByID = {}
         self.poolsByID <- {}
+        self.poolsMap = {}
         self.nextPoolID = 0
         
         // defaults for new pools
