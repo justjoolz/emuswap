@@ -79,6 +79,30 @@ pub contract EmuSwap: FungibleTokens {
     pub event FeesDeposited(tokenIdentifier: String, amount: UFix64)
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Structures
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // PoolMeta
+    //
+    // Basic metadata about a pool
+    //
+    pub struct PoolMeta {
+        pub let token1Amount: UFix64
+        pub let token2Amount: UFix64
+
+        pub let token1Identifier: String
+        pub let token2Identifier: String
+
+        init(poolRef: &Pool) {
+            self.token1Amount = poolRef.token1Vault?.balance!
+            self.token2Amount = poolRef.token2Vault?.balance!
+            self.token1Identifier = poolRef.token1Vault.getType().identifier
+            self.token2Identifier = poolRef.token2Vault.getType().identifier
+            // poolRef.DAOFeePercentage
+            // poolRef.LPFeePercentage
+        }
+    }
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Resources
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -503,7 +527,7 @@ pub contract EmuSwap: FungibleTokens {
     // Admin resource
     //
     // Stored in account contract is deployed to on initalization
-    // Only the admin resource can create new pools, update fees and freeze unfreeze pools
+    // Only the admin resource can create new pools, update fees and freeze/unfreeze pools
     //
     pub resource Admin {
 
@@ -636,7 +660,6 @@ pub contract EmuSwap: FungibleTokens {
     }
 
 
-
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Private Functions
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -686,27 +709,51 @@ pub contract EmuSwap: FungibleTokens {
         emit FeesDeposited(tokenIdentifier: identifier, amount: amount)
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Structures
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    // PoolMeta
-    //
-    // Basic metadata about a pool
-    //
-    pub struct PoolMeta {
-        pub let token1Amount: UFix64
-        pub let token2Amount: UFix64
 
-        pub let token1Identifier: String
-        pub let token2Identifier: String
+    // Helper Functions
 
-        init(poolRef: &Pool) {
-            self.token1Amount = poolRef.token1Vault?.balance!
-            self.token2Amount = poolRef.token2Vault?.balance!
-            self.token1Identifier = poolRef.token1Vault.getType().identifier
-            self.token2Identifier = poolRef.token2Vault.getType().identifier
+    pub fun getContractAddress(_ str: String): String {
+        return EmuSwap.split(str)[0]
+    }
+
+    pub fun getContractName(_ str: String): String {
+        return EmuSwap.split(str)[1]
+    }
+
+    pub fun getResourceName(_ str: String): String {
+        return EmuSwap.split(str)[2]
+    }
+
+    // split("A.f8d6e0586b0a20c7.ExampleNFT.NFT") returns ["f8d6e0586b0a20c7", "ExampleNFT", "NFT"]
+    pub fun split(_ str: String): [String] {
+        let at = EmuSwap.at(str)
+        var chunks: [String] = []
+        var i = 1
+        var bottom = 0
+        var top = at[0]
+        while i < at.length  {
+            bottom = top
+            top = at[i]
+            chunks.append(str.slice(from: bottom+1, upTo: top))
+            i = i + 1
         }
+        chunks.append(str.slice(from: top+1, upTo: str.length))
+        return chunks
+    }
+
+    pub fun at(_ input: String): [Int] {
+        var i = 0
+        var at: [Int] = []
+
+        while i < input.length {
+            if input[i] == "." {
+                at.append(i)
+            }
+            i = i + 1
+        }
+
+        return at
     }
     
     // Contract Initalization
@@ -730,8 +777,8 @@ pub contract EmuSwap: FungibleTokens {
 
         self.AdminStoragePath = /storage/EmuSwapAdmin
 
-        let admin <- create Admin()
-        self.account.save(<-admin, to: EmuSwap.AdminStoragePath)
+        destroy self.account.load<@AnyResource>(from: EmuSwap.AdminStoragePath)
+        self.account.save(<- create Admin(), to: EmuSwap.AdminStoragePath)
 
         emit ContractInitialized()
     }
