@@ -501,7 +501,7 @@ pub contract EmuSwap: FungibleTokens {
         }
 
         pub fun borrowViewResolver(id: UInt64): &{MetadataViews.Resolver} {
-            let vault = &self.ownedVaults[id] as auth &FungibleTokens.TokenVault
+            let vault = (&self.ownedVaults[id] as auth &FungibleTokens.TokenVault?)
             let emuSwapVault = vault as! &EmuSwap.TokenVault
             return emuSwapVault as &{MetadataViews.Resolver} 
         }
@@ -512,7 +512,7 @@ pub contract EmuSwap: FungibleTokens {
         }
 
         pub fun borrowVault(id: UInt64): &FungibleTokens.TokenVault {
-            return &self.ownedVaults[id] as! &FungibleTokens.TokenVault
+            return (&self.ownedVaults[id] as! &FungibleTokens.TokenVault?)!
         }
 
         init() {
@@ -570,20 +570,17 @@ pub contract EmuSwap: FungibleTokens {
         }
 
         pub fun updateLPFeePercentage(id: UInt64, feePercentage: UFix64) {
-            let poolRef = &EmuSwap.poolsByID[id] as &Pool
-            poolRef.setLPFeePercentage(feePercentage)
+            (&EmuSwap.poolsByID[id] as &Pool?)!.setLPFeePercentage(feePercentage)
             emit LPFeeUpdated(poolID: id, feePercentage: feePercentage)
         }
         
         pub fun updateDAOFeePercentage(id: UInt64, feePercentage: UFix64) {
-            let poolRef = &EmuSwap.poolsByID[id] as &Pool
-            poolRef.setDAOFeePercentage(feePercentage)
+            (&EmuSwap.poolsByID[id] as &Pool?)!.setDAOFeePercentage(feePercentage)
             emit DAOFeeUpdated(poolID: id, feePercentage: feePercentage)
         }
 
         pub fun togglePoolFreeze(id: UInt64) {
-            let poolRef = &EmuSwap.poolsByID[id] as &Pool
-            poolRef.togglePoolFreeze()
+            (&EmuSwap.poolsByID[id] as &Pool?)!.togglePoolFreeze()
         }
     }
 
@@ -608,12 +605,7 @@ pub contract EmuSwap: FungibleTokens {
     // returns reference to the requested pool if it exists or nil for caller to handle
     //
     pub fun borrowPool(id: UInt64): &Pool? {
-        if EmuSwap.poolsByID[id] != nil {
-            return &EmuSwap.poolsByID[id] as &Pool
-        }
-        else {
-            return nil
-        }
+        return &EmuSwap.poolsByID[id] as &Pool?
     }
 
     pub fun getPoolIDs(): [UInt64] {

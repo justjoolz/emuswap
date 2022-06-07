@@ -84,6 +84,10 @@ pub contract StakingRewards {
             destroy self.vault
         }
 
+        pub fun updateFarmWeight(id: UInt64, weight: UFix64) {
+            self.farmWeightsByID[id] = weight
+        }
+
         pub fun acceptsNFTsByKeys(_ keys: [String]): Bool {
             if self.accessNFTsAccepted.length == 0 { return true }
             var i = 0
@@ -98,7 +102,6 @@ pub contract StakingRewards {
 
         pub fun acceptsNFTs(_ nfts: &[NonFungibleToken.NFT]): Bool {
             if self.accessNFTsAccepted.length == 0 { return true }  // if empty means no nft is required
-            let test: Bool = false
             while nfts.length > 0 {
                 let nft = &nfts.removeFirst() as &NonFungibleToken.NFT
                 let identifier = nft.getType().identifier
@@ -135,7 +138,7 @@ pub contract StakingRewards {
             self.stakes <- {}
             self.totalAccumulatedTokensPerShareByRewardPoolID = {}
 
-            // Populate accumulated tokens per reward pool
+            // Initalize accumulated tokens for all reward pools reward pool
             for id in StakingRewards.rewardPoolsByID.keys {
                 self.totalAccumulatedTokensPerShareByRewardPoolID[id] = 0.0
             }
@@ -149,6 +152,12 @@ pub contract StakingRewards {
 
         destroy () {
             destroy self.stakes
+        }
+
+        // Initalizes a Pool ID in the accumulated tokens dictionary. 
+        // Used when new reward pool is created for existing farms
+        access(contract) fun initPool(poolID: UInt64) {
+            self.totalAccumulatedTokensPerShareByRewardPoolID[poolID] = 0.0
         }
 
         // Update Farm
@@ -172,7 +181,7 @@ pub contract StakingRewards {
             let period = now - self.lastRewardTimestamp
 
             for rewardPoolID in self.totalAccumulatedTokensPerShareByRewardPoolID.keys { 
-                let rewardRef = &StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool
+                let rewardRef = (&StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool?)!
 
                 // Calculate reward  
                 let rewardTokensPerSecond = rewardRef.emissionDetails.getCurrentEmissionRate(genesisTS: rewardRef.rewardsGenesisTimestamp)
@@ -192,12 +201,12 @@ pub contract StakingRewards {
         //
         pub fun getPendingRewards(address: Address): {UInt64: Fix64} {
             if self.stakes[address] == nil { return {} }
-            let stakeRef = &self.stakes[address] as &Stake
+            let stakeRef = (&self.stakes[address] as &Stake?)!
             let pendingRewards: {UInt64: Fix64} = {}
             let now = StakingRewards.now()
 
             for rewardPoolID in self.totalAccumulatedTokensPerShareByRewardPoolID.keys {
-                let rewardRef = &StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool
+                let rewardRef = (&StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool?)!
                 var totalAccumulatedTokensPerShare = self.totalAccumulatedTokensPerShareByRewardPoolID[rewardPoolID]
                 
                 if (now > self.lastRewardTimestamp) && (stakeRef.lpTokenVault.balance > 0.0) { // calculate unclaimed tokens since last reward payment
@@ -230,7 +239,7 @@ pub contract StakingRewards {
             // special case first ever stake sets genesis reward timestamp of first ever reward pool... all future pools must have a genesis timestamp starting time provided on creation
             if self.stakes.length == 0 {
                 let field = self.totalAccumulatedTokensPerShareByRewardPoolID[0]!
-                let rewardRef = &StakingRewards.rewardPoolsByID[0] as &RewardPool
+                let rewardRef = (&StakingRewards.rewardPoolsByID[0] as &RewardPool?)!
                 rewardRef.rewardsGenesisTimestamp = self.lastRewardTimestamp
             }
             
@@ -245,7 +254,7 @@ pub contract StakingRewards {
 
                 // calculate reward debts for each reward pool
                 for rewardPoolID in StakingRewards.rewardPoolsByID.keys {
-                    let rewardPoolRef = &StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool
+                    let rewardPoolRef = (&StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool?)!
                     if rewardPoolRef.accessNFTsAccepted.length == 0 || rewardPoolRef.acceptsNFTs(&nfts as &[NonFungibleToken.NFT]) { // if no nft required or accepted nft deposited    
                         let rewardDebt = Fix64(amountStaked * self.totalAccumulatedTokensPerShareByRewardPoolID[rewardPoolID]!)
                         rewardDebtByID[rewardPoolID] = rewardDebt
@@ -267,7 +276,7 @@ pub contract StakingRewards {
             } 
 
             else { // user already has an existing stake in this farm
-                let stakeRef = &self.stakes[lpTokensReceiverCap.address] as &Stake        
+                let stakeRef = (&self.stakes[lpTokensReceiverCap.address] as &Stake?)!        
                 // add to existing stake
                 stakeRef.lpTokenVault.deposit(from: <-lpTokens)
 
@@ -275,7 +284,7 @@ pub contract StakingRewards {
                 while nfts.length > 0 {
                     let nft <- nfts.removeFirst()
                     assert(stakeRef.nfts[nft.getType().identifier] == nil, message: "Duplicate NFT type detected, only 1 nft per collection required.")
-                    stakeRef.nfts[nft.getType().identifier] <-! nft
+                    stakeRef.depositNFT(nft:  <- nft )
                 }
                 destroy nfts // empty :)
                                 
@@ -285,12 +294,11 @@ pub contract StakingRewards {
                 // calculate reward debt for all reward pools of the farm
                 let rewardDebtByID: {UInt64: Fix64} = {}
                 for poolID in StakingRewards.rewardPoolsByID.keys {
-                    let rewardPoolRef = &StakingRewards.rewardPoolsByID[poolID] as &RewardPool
+                    let rewardPoolRef = (&StakingRewards.rewardPoolsByID[poolID] as &RewardPool?)!
                     if rewardPoolRef.acceptsNFTsByKeys(stakeRef.getNFTIdentifiers()) {
-                        rewardDebtByID[poolID] = stakeRef.rewardDebtByID[poolID]! + Fix64(amountStaked * self.totalAccumulatedTokensPerShareByRewardPoolID[poolID]!)
+                        stakeRef.setRewardDebt(id: poolID, debt: stakeRef.rewardDebtByID[poolID]! + Fix64(amountStaked * self.totalAccumulatedTokensPerShareByRewardPoolID[poolID]!))
                     }
                 }
-                stakeRef.setRewardDebt(rewardDebtByID)
 
                 emit TokensStaked(address: lpTokensReceiverCap.address, amountStaked: amountStaked, totalStaked: self.totalStaked)
                 return nil // no need to give them a new StakeController
@@ -331,9 +339,9 @@ pub contract StakingRewards {
 
             // payout rewards
             for poolID in StakingRewards.rewardPoolsByID.keys {
-                let rewardPoolRef = &StakingRewards.rewardPoolsByID[poolID] as &RewardPool
+                let rewardPoolRef = (&StakingRewards.rewardPoolsByID[poolID] as &RewardPool?)!
                 if rewardPoolRef.acceptsNFTsByKeys(stakeRef.getNFTIdentifiers()) {
-                    stakeRef.rewardDebtByID[poolID] = stakeRef.rewardDebtByID[poolID]! - Fix64(amount * self.totalAccumulatedTokensPerShareByRewardPoolID[poolID]!)
+                    stakeRef.setRewardDebt(id: poolID, debt: stakeRef.rewardDebtByID[poolID]! - Fix64(amount * self.totalAccumulatedTokensPerShareByRewardPoolID[poolID]!))
                 }
             }
 
@@ -357,7 +365,7 @@ pub contract StakingRewards {
 
                 if stakeRef.rewardsReceiverCaps[poolID]?.borrow() != nil { // user has provided the correct receiver already... if there is a new reward pool added the user will need to setup and provide a new matching receiver to claim 
                     // update reward debt
-                    stakeRef.rewardDebtByID[poolID] = Fix64(accumulatedTokens)
+                    stakeRef.setRewardDebt(id: poolID, debt: Fix64(accumulatedTokens))
                     // distribute pending
                     let rewards <- StakingRewards.rewardPoolsByID[poolID]?.vault?.withdraw(amount: UFix64(pending))!
                     let rewardTokenType = rewards.getType().identifier
@@ -374,7 +382,7 @@ pub contract StakingRewards {
                 stakesMeta.insert(
                     key: key,
                     StakeInfo(
-                        &self.stakes[key] as &Stake,
+                        (&self.stakes[key] as &Stake?)!,
                         farm: &self as &Farm
                     )
                 )
@@ -385,7 +393,7 @@ pub contract StakingRewards {
         pub fun getAllAccessNFTsAccepted(): [String] {
             let accessNFTsAccepted: [String] = []
             for rewardPoolID in StakingRewards.rewardPoolsByID.keys {
-                let rewardPoolRef = &StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool
+                let rewardPoolRef = (&StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool?)!
                 for nftIdentifier in rewardPoolRef.accessNFTsAccepted {
                     if !accessNFTsAccepted.contains(nftIdentifier) {
                         accessNFTsAccepted.append(nftIdentifier)
@@ -434,6 +442,14 @@ pub contract StakingRewards {
             destroy nfts // all gone :)
         }
 
+        pub fun setRewardReceiverCap(id: UInt64, capability: Capability<&{FungibleToken.Receiver}>) {
+            self.rewardsReceiverCaps[id] = capability
+        }
+
+        pub fun setRewardDebt(id: UInt64, debt: Fix64) {
+            self.rewardDebtByID[id] = debt
+        }
+
         pub fun getNFTIdentifiers(): [String] {
             let keys: [String] = []
             for key in self.nfts.keys {
@@ -451,10 +467,6 @@ pub contract StakingRewards {
                 !self.nfts.containsKey(nft.getType().identifier): "NFT of this collection already staked!"
             }
             self.nfts[nft.getType().identifier] <-! nft
-        }
-
-        access(contract) fun setRewardDebt(_ debt: {UInt64: Fix64}) {
-            self.rewardDebtByID = debt 
         }
 
         destroy () {
@@ -495,8 +507,8 @@ pub contract StakingRewards {
         //
         pub fun borrowStake(): &Stake {
             let farmRef = StakingRewards.borrowFarm(id: self.farmID)!
-            let stakeRef = &farmRef.stakes[self.owner?.address!] as &Stake
-            return stakeRef
+            let stakeRef = &farmRef.stakes[self.owner?.address!] as &Stake?
+            return stakeRef!
         }
 
         pub fun getAccessNFTsAccepted(): [String] {
@@ -517,7 +529,7 @@ pub contract StakingRewards {
 
         pub fun addRewardReceiverCap(id: UInt64, capability: Capability<&AnyResource{FungibleToken.Receiver}>) {
             let stakeRef = self.borrowStake()
-            stakeRef.rewardsReceiverCaps[id] = capability
+            stakeRef.setRewardReceiverCap(id: id, capability: capability)
         }
 
     }
@@ -540,7 +552,7 @@ pub contract StakingRewards {
         }
 
         pub fun borrow(id: UInt64): &StakeController? {
-            return &self.ownedStakeControllers[id] as &StakeController
+            return &self.ownedStakeControllers[id] as &StakeController?
         }
 
         init() {
@@ -574,8 +586,8 @@ pub contract StakingRewards {
             StakingRewards.nextRewardPoolID = StakingRewards.nextRewardPoolID + 1
 
              for id in StakingRewards.farmsByID.keys {
-                let farmRef = &StakingRewards.farmsByID[id] as &Farm
-                farmRef.totalAccumulatedTokensPerShareByRewardPoolID[poolID] = 0.0
+                let farmRef = (&StakingRewards.farmsByID[id] as &Farm?)!
+                farmRef.initPool(poolID: poolID)
             }
             // emit RewardPoolCreated() // j00lz 2do
         }
@@ -607,11 +619,11 @@ pub contract StakingRewards {
         }
 
         pub fun updateFarmWeightForRewardPool(rewardPoolID: UInt64, farmID: UInt64, newWeight: UFix64) {
-            let rewardRef = &StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool
-            let oldWeight = rewardRef.farmWeightsByID[farmID]!
+            let rewardPoolRef = (&StakingRewards.rewardPoolsByID[rewardPoolID] as &RewardPool?)!
+            let oldWeight = rewardPoolRef.farmWeightsByID[farmID]!
 
-            rewardRef.farmWeightsByID[farmID] = newWeight
-            rewardRef.totalWeight = rewardRef.totalWeight - oldWeight + newWeight
+            rewardPoolRef.updateFarmWeight(id: farmID, weight: newWeight)
+            rewardPoolRef.totalWeight = rewardPoolRef.totalWeight - oldWeight + newWeight
         }
 
          // toggles use of mocktime
@@ -652,7 +664,7 @@ pub contract StakingRewards {
             self.totalAccumulatedTokensPerShareByID = {}
 
             for poolID in StakingRewards.rewardPoolsByID.keys {
-                let rewardPoolRef = &StakingRewards.rewardPoolsByID[poolID] as &RewardPool
+                let rewardPoolRef = (&StakingRewards.rewardPoolsByID[poolID] as &RewardPool?)!
                 self.farmWeightsByID[poolID] = rewardPoolRef.farmWeightsByID[self.id]!
                 self.rewardTokensPerSecondByID[poolID] = rewardPoolRef.emissionDetails.getCurrentEmissionRate(genesisTS: rewardPoolRef.rewardsGenesisTimestamp)
                 self.totalAccumulatedTokensPerShareByID[poolID] = farmRef.totalAccumulatedTokensPerShareByRewardPoolID[poolID]
@@ -665,7 +677,7 @@ pub contract StakingRewards {
     }
 
     pub fun getFarmMeta(id: UInt64): FarmMeta? {
-        let farmRef = &StakingRewards.farmsByID[id] as &Farm
+        let farmRef = (&StakingRewards.farmsByID[id] as &Farm?)!
         if farmRef != nil {
             return FarmMeta(farmRef)
         }
@@ -673,10 +685,7 @@ pub contract StakingRewards {
     }
 
     pub fun borrowFarm(id: UInt64): &Farm? {
-        if self.farmsByID.keys.contains(id) {
-            return &self.farmsByID[id] as &Farm
-        } 
-        return nil
+        return &self.farmsByID[id] as &Farm?
     }
    
     pub struct interface IEmissionDetails {
