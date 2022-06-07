@@ -13,7 +13,7 @@ func main() {
 	// flow transactions send "./transactions/EmuSwap/admin/create_new_pool_FLOW_FUSD.cdc" 100.0 500.0 --signer "admin-account"
 	//o.TransactionFromFile("EmuSwap/admin/create_new_pool_FLOW_FUSD").SignProposeAndPayAs("account").NamedArguments(map[string]string{"token1": "100.0", "token2": "500.0"}).RunPrintEventsFull()
 
-	fmt.Print("Minting Flow TOkens")
+	fmt.Print("Minting Flow Tokens")
 
 	o.TransactionFromFile("demo/mintFlowTokens").
 		SignProposeAndPayAs("account").
@@ -50,6 +50,9 @@ func main() {
 	o.TransactionFromFile("demo/mintFUSD").SignProposeAndPayAs("account").Args(o.Arguments().UFix64(1000.0).Address("user2")).RunPrintEventsFull()
 	o.TransactionFromFile("demo/mintFUSD").SignProposeAndPayAs("account").Args(o.Arguments().UFix64(1000.0).Address("user3")).RunPrintEventsFull()
 
+	// EmuSwap tests
+	//
+
 	fmt.Print("Admin creates Flow/FUSD pool")
 	// flow transactions send "./transactions/EmuSwap/admin/create_new_pool_FLOW_FUSD.cdc" 100.0 500.0 --signer "admin-account"
 	o.TransactionFromFile("EmuSwap/admin/create_new_pool_FLOW_FUSD").
@@ -60,6 +63,79 @@ func main() {
 			UFix64(500.0)).
 		RunPrintEventsFull()
 
+	o.ScriptFromFile("get_dao_fee_percentage").Run()
+	o.ScriptFromFile("get_lp_fee_percentage").Run()
+
+	fmt.Print("Admin updates LP fee percentage")
+	o.TransactionFromFile("EmuSwap/admin/update_lp_fee_percentage").
+		SignProposeAndPayAs("account").
+		Args(o.Arguments().
+			UInt64(0).
+			UFix64(0.0025)).
+		RunPrintEventsFull()
+
+	fmt.Print("Admin updates DAO fee percentage")
+	o.TransactionFromFile("EmuSwap/admin/update_dao_fee_percentage").
+		SignProposeAndPayAs("account").
+		Args(o.Arguments().
+			UInt64(0).
+			UFix64(0.0025)).
+		RunPrintEventsFull()
+
+	o.ScriptFromFile("get_pool_ids").Run()
+	o.ScriptFromFile("get_pool_meta").Args(o.Arguments().UInt64(0)).Run()
+	o.ScriptFromFile("get_pools_meta").Run()
+
+	// Get quotes
+	fmt.Print("Getting quotes:")
+	o.ScriptFromFile("pool/get_quotes").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
+	o.ScriptFromFile("pool/get_quote_a_to_exact_b").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
+	o.ScriptFromFile("pool/get_quote_b_to_exact_a").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
+	o.ScriptFromFile("pool/get_quote_exact_a_to_b").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
+	o.ScriptFromFile("pool/get_quote_exact_b_to_a").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
+
+	// Swap
+	fmt.Print("User 1 Swaps 1.0 Flow for FUSD")
+	o.TransactionFromFile("EmuSwap/exchange/swap_flow_for_fusd").
+		SignProposeAndPayAs("user1").
+		Args(o.Arguments().
+			UFix64(1.0)).
+		RunPrintEventsFull()
+
+	o.ScriptFromFile("get_pools_meta").Run()
+	o.ScriptFromFile("pool/get_quotes").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
+
+	fmt.Print("User 2 Swaps 1.0 FUSD for Flow")
+	o.TransactionFromFile("EmuSwap/exchange/swap_flow_for_fusd").
+		SignProposeAndPayAs("user2").
+		Args(o.Arguments().
+			UFix64(1.0)).
+		RunPrintEventsFull()
+
+	o.ScriptFromFile("get_pools_meta").Run()
+	o.ScriptFromFile("pool/get_quotes").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
+
+	fmt.Print("User 1 Swaps 1.0 Flow for FUSD")
+	o.TransactionFromFile("EmuSwap/exchange/swap_flow_for_fusd").
+		SignProposeAndPayAs("user1").
+		Args(o.Arguments().
+			UFix64(1.0)).
+		RunPrintEventsFull()
+
+	o.ScriptFromFile("get_pools_meta").Run()
+	o.ScriptFromFile("pool/get_quotes").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
+
+	fmt.Print("User 2 Swaps 1.0 FUSD for Flow")
+	o.TransactionFromFile("EmuSwap/exchange/swap_flow_for_fusd").
+		SignProposeAndPayAs("user2").
+		Args(o.Arguments().
+			UFix64(1.0)).
+		RunPrintEventsFull()
+
+	o.ScriptFromFile("get_pools_meta").Run()
+	o.ScriptFromFile("pool/get_quotes").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
+
+	// Add Liquidity
 	fmt.Print("User 1 adds liquidity 200 1000")
 	o.TransactionFromFile("EmuSwap/exchange/add_liquidity_FLOW_FUSD").
 		SignProposeAndPayAs("user1").
@@ -72,11 +148,23 @@ func main() {
 	fmt.Print("User 2 adds liquidity Flow/FUSD 200 1000")
 	o.TransactionFromFile("EmuSwap/exchange/add_liquidity_FLOW_FUSD").
 		SignProposeAndPayAs("user2").
-		Args(o.
-			Arguments().
+		Args(o.Arguments().
 			UFix64(200.0).
 			UFix64(1000.0)).
 		RunPrintEventsFull()
+
+	fmt.Print("User 1 withdraws liquidity")
+	o.TransactionFromFile("EmuSwap/exchange/remove_liquidity_FLOW_FUSD").
+		SignProposeAndPayAs("user1").
+		Args(o.Arguments().
+			UFix64(0.001)).
+		RunPrintEventsFull()
+
+	o.ScriptFromFile("pool/get_quotes").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
+	o.ScriptFromFile("read_fees_collected").Run()
+
+	// Staking
+	//
 
 	// flow transactions send "./transactions/Staking/admin/toggle_mock_time.cdc" --signer "admin-account"
 	o.TransactionFromFile("Staking/admin/toggle_mock_time").
@@ -110,13 +198,13 @@ func main() {
 			UFix64(1.0)).
 		RunPrintEventsFull()
 
-	fmt.Print("User1 Stakes 1.0")
+	fmt.Print("User1 Stakes 0.001")
 	// flow transactions send "./transactions/Staking/user/stake.cdc" 1.0 --signer "user-account1"
 	o.TransactionFromFile("Staking/user/stake").
 		SignProposeAndPayAs("user1").
 		Args(o.
 			Arguments().
-			UFix64(0.2)).
+			UFix64(0.001)).
 		RunPrintEventsFull()
 
 	// flow transactions send "./transactions/Staking/admin/update_mock_timestamp.cdc" 100.0 --signer "admin-account"
@@ -143,14 +231,14 @@ func main() {
 			UFix64(0.18999999)).
 		RunPrintEventsFull()
 
-	fmt.Print("User 1 Withdraws half their staked LP Tokens (0.1) ")
+	fmt.Print("User 1 Withdraws half their staked LP Tokens (0.0005) ")
 	// flow transactions send "./transactions/Staking/user/unstake.cdc" 0 0.5 --signer "user-account1"
 	o.TransactionFromFile("Staking/user/unstake").
 		SignProposeAndPayAs("user1").
 		Args(o.
 			Arguments().
 			UInt64(0).
-			UFix64(0.1)).
+			UFix64(0.0005)).
 		RunPrintEventsFull()
 
 	//flow scripts execute "./scripts/Staking/get_farm_meta.cdc" 0
@@ -178,7 +266,7 @@ func main() {
 		Args(o.
 			Arguments().
 			UInt64(0).
-			UFix64(0.001)).
+			UFix64(0.0001)).
 		RunPrintEventsFull()
 
 	//# flow transactions send "./transactions/Staking/user/unstake.cdc" 0 0.001 --signer "user-account2"
@@ -187,7 +275,7 @@ func main() {
 		Args(o.
 			Arguments().
 			UInt64(0).
-			UFix64(0.001)).
+			UFix64(0.00005)).
 		RunPrintEventsFull()
 
 	//#flow scripts execute "./scripts/Staking/get_farm_meta.cdc" 0
