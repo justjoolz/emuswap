@@ -4,7 +4,7 @@
 
 import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
 
-transaction(feePercentage: UFix64) {
+transaction(id: UInt64, feePercentage: UFix64) {
 
   let adminRef: &EmuSwap.Admin
 
@@ -16,6 +16,6 @@ transaction(feePercentage: UFix64) {
   }
 
   execute {
-      self.adminRef.updateLPFeePercentage(feePercentage: feePercentage)
+      self.adminRef.updateLPFeePercentage(id: id, feePercentage: feePercentage)
   }
 }
