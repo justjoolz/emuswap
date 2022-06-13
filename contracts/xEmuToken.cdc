@@ -24,7 +24,9 @@ pub contract xEmuToken: FungibleToken {
     pub var totalSupply: UFix64
 
     // xEmuVault Storage Path
-    pub let xEmuTokenVaultStoragePath: StoragePath
+    pub let EmuTokenStoragePath: StoragePath
+    pub let xEmuTokenBalancePublicPath: PublicPath
+    pub let xEmuTokenReceiverPublicPath: PublicPath
     
     // Event that is emitted when the contract is created
     pub event TokensInitialized(initialSupply: UFix64)
@@ -180,15 +182,15 @@ pub contract xEmuToken: FungibleToken {
     // Leave the pool. Claim back your Emu.
     // Returns the staked + gained Emu and burns xEmu
     //
-    pub fun leavePool(xEmuVault: @FungibleToken.Vault): @FungibleToken.Vault {
+    pub fun leavePool(xEmuTokens: @FungibleToken.Vault): @FungibleToken.Vault {
         pre {
             self.emuPool.balance > 0.0 : "Pool is empty!"
-            xEmuVault.balance > 0.0 : "Insufficient xEmu Tokens!"
+            xEmuTokens.balance > 0.0 : "Insufficient xEmu Tokens!"
         }
         // Calculates the amount of Emu the xEmu is worth
-        let amount = xEmuVault.balance * self.emuPool.balance / self.totalSupply
+        let amount = xEmuTokens.balance * self.emuPool.balance / self.totalSupply
         
-        self.burnTokens(from: <- xEmuVault)
+        self.burnTokens(from: <- xEmuTokens)
         
         return <- self.emuPool.withdraw(amount: amount)
     }
@@ -217,15 +219,18 @@ pub contract xEmuToken: FungibleToken {
         //
         let vault <- create Vault(balance: self.totalSupply)
 
-        self.xEmuTokenVaultStoragePath = /storage/xEmuTokenVault
-        self.account.save(<-vault, to: self.xEmuTokenVaultStoragePath)
+        self.EmuTokenStoragePath = /storage/xEmuTokenVault
+        self.xEmuTokenBalancePublicPath = /public/xEmuTokenBalance
+        self.xEmuTokenReceiverPublicPath = /public/xEmuTokenReceiver
+
+        self.account.save(<-vault, to: self.EmuTokenStoragePath)
 
         // Create a public capability to the stored Vault that only exposes
         // the `deposit` method through the `Receiver` interface
         //
         self.account.link<&xEmuToken.Vault{FungibleToken.Receiver}>(
             /public/xEmuTokenReceiver,
-            target: self.xEmuTokenVaultStoragePath
+            target: self.EmuTokenStoragePath
         )
 
         // Create a public capability to the stored Vault that only exposes
@@ -233,7 +238,7 @@ pub contract xEmuToken: FungibleToken {
         //
         self.account.link<&xEmuToken.Vault{FungibleToken.Balance}>(
             /public/xEmuTokenBalance,
-            target: self.xEmuTokenVaultStoragePath
+            target: self.EmuTokenStoragePath
         )
 
         // Emit an event that shows that the contract was initialized
