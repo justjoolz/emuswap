@@ -55,7 +55,7 @@ pub contract Airdrop {
     pub fun checkAvailableClaims(address: Address): {UInt64: Type} {
         let claimableDropIDs: {UInt64: Type} = {} 
         for key in self.drops.keys {
-            let dropRef = &self.drops[key] as &Drop
+            let dropRef = (&self.drops[key] as &Drop?)!
             if dropRef.availableToClaimByAddress.containsKey(address) {
                 claimableDropIDs.insert(key: key, dropRef.ftReceiverCap.getType())
             }
@@ -68,7 +68,7 @@ pub contract Airdrop {
     // Claims full amount available for the address of the ft receiver cap provided 
     //
     pub fun claimDrop(dropID: UInt64, ftReceiverCap: Capability<&{FungibleToken.Receiver}>) {
-        let dropRef = &self.drops[dropID] as &Drop
+        let dropRef = (&self.drops[dropID] as &Drop?)!
         let amount = dropRef.availableToClaimByAddress[ftReceiverCap.address]!
         dropRef.claim(amount: amount, ftReceiverCap: ftReceiverCap)
         emit DropClaimed(id: dropID, address: ftReceiverCap.address, amount: amount)
@@ -84,6 +84,10 @@ pub contract Airdrop {
         access(contract) let startTime: UFix64
         access(contract) let endTime: UFix64
         access(contract) let availableToClaimByAddress: {Address: UFix64}
+
+        access(contract) fun addClaim(address: Address, amount: UFix64) {
+            self.availableToClaimByAddress.insert(key: address, amount)
+        }
 
         pub fun claim(amount:UFix64, ftReceiverCap: Capability<&{FungibleToken.Receiver}>) {
             let claimAddress = ftReceiverCap.address
@@ -130,13 +134,13 @@ pub contract Airdrop {
         // Total must be less than funds deposited
         //
         pub fun addClaims(addresses: {Address: UFix64}) {
-            let dropRef = &Airdrop.drops[self.id] as &Drop
+            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
             assert(getCurrentBlock().timestamp <= dropRef.startTime, message: "Cannot add addresses once claim has begun")
             var totalClaims = dropRef.totalClaims()
             for key in addresses.keys {
                 totalClaims = totalClaims + dropRef.availableToClaimByAddress[key]!
                 assert(totalClaims <= dropRef.vault.balance, message: "More claims than balance available!")
-                dropRef.availableToClaimByAddress.insert(key: key, addresses[key]!)
+                dropRef.addClaim(address: key, amount: addresses[key]!)
             }
         }
 
@@ -146,7 +150,7 @@ pub contract Airdrop {
         // owner can withdraw any unclaimed funds to their  ft receiver provided on creation
         //
         pub fun withdrawFunds() {
-            let dropRef = &Airdrop.drops[self.id] as &Drop
+            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
             assert(getCurrentBlock().timestamp < dropRef.endTime, message: "Drop has not ended yet!")
             let funds <- dropRef.vault.withdraw(amount: dropRef.vault.balance)
             dropRef.ftReceiverCap.borrow()?.deposit!(from: <- funds)
@@ -157,7 +161,7 @@ pub contract Airdrop {
         // owner can deposit additional funds before the drop starts
         //
         pub fun depositFunds(funds: @FungibleToken.Vault) {
-            let dropRef = &Airdrop.drops[self.id] as &Drop
+            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
             assert(getCurrentBlock().timestamp < dropRef.startTime, message: "Drop has already started!")
             dropRef.vault.deposit(from: <- funds)
         }
@@ -169,7 +173,7 @@ pub contract Airdrop {
 
         // owner can destroy their controller returning all funds to the provided ft receiver
         destroy () {
-            let dropRef = &Airdrop.drops[self.id] as &Drop
+            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
             assert(getCurrentBlock().timestamp > dropRef.endTime, message: "Cannot destroy before endtime is reached")
             if dropRef.vault.balance > 0.0 {
                 self.withdrawFunds()
