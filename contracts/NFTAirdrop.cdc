@@ -41,7 +41,7 @@ pub contract Airdrop {
     pub fun checkAvailableClaims(address: Address): {UInt64: Type} {
         let claimableDropIDs: {UInt64: Type} = {} 
         for id in self.drops.keys {
-            let dropRef = &self.drops[id] as &Drop
+            let dropRef = (&self.drops[id] as &Drop?)!
             if dropRef.availableToClaimByAddress.containsKey(address) {
                 claimableDropIDs.insert(key: id, dropRef.nftReceiverCap.getType()) // could insert {key: required FungibleTokenType
             }
@@ -56,8 +56,8 @@ pub contract Airdrop {
     // Claims an amount for the address of the ft receiver cap provided 
     //
     pub fun claimDrop(dropID: UInt64, amount: UInt64, nftReceiverCap: Capability<&{NonFungibleToken.Receiver}>) {
-        let dropRef = &self.drops[dropID] as &Drop
-        dropRef.claim(amount: amount, nftReceiverCap: nftReceiverCap)
+        let dropRef = &self.drops[dropID] as &Drop?
+        dropRef!.claim(amount: amount, nftReceiverCap: nftReceiverCap)
     }
 
     // Drop Resource
@@ -70,6 +70,10 @@ pub contract Airdrop {
         pub let startTime: UFix64
         pub let endTime: UFix64
         pub let availableToClaimByAddress: {Address: UInt64}
+
+        pub fun addClaim(address: Address, id: UInt64) {
+            self.availableToClaimByAddress.insert(key: address, id)
+        }
 
         pub fun claim(amount:UInt64, nftReceiverCap: Capability<&{NonFungibleToken.Receiver}>) {
             pre {
@@ -114,18 +118,18 @@ pub contract Airdrop {
         pub let id: UInt64
 
         pub fun addClaims(addresses: {Address: UInt64}) {
-            let dropRef = &Airdrop.drops[self.id] as &Drop
+            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
             let nftsAvailable = UInt64(dropRef.collection.getIDs().length)
             var totalClaims = (0 as UInt64)
             for key in addresses.keys {
                 totalClaims = totalClaims + addresses[key]!
                 assert(totalClaims <= nftsAvailable, message: "More claims than NFTs!" )
-                dropRef.availableToClaimByAddress.insert(key: key, addresses[key]!)
+                dropRef.addClaim(address: key, id: addresses[key]!)
             }
         }
 
         pub fun withdrawRemainingNFTs() {
-            let dropRef = &Airdrop.drops[self.id] as &Drop
+            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
             assert(getCurrentBlock().timestamp > dropRef.endTime, message: "Drop has not ended yet!")
             for id in dropRef.collection.getIDs() {
                 let token <- dropRef.collection.withdraw(withdrawID: id)
@@ -138,7 +142,7 @@ pub contract Airdrop {
         }
 
         destroy () {
-            let dropRef = &Airdrop.drops[self.id] as &Drop
+            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
             if dropRef.collection.getIDs().length > 0 {
                 self.withdrawRemainingNFTs()
             }

@@ -9,7 +9,7 @@ transaction(amount: UFix64, to: Address) {
   prepare(signer: AuthAccount) {
     // Get a reference to the signer's stored vault
     let vaultRef = signer
-      .borrow<&xEmuToken.Vault>(from: xEmuToken.xEmuTokenVaultStoragePath)
+      .borrow<&xEmuToken.Vault>(from: xEmuToken.EmuTokenStoragePath)
       ?? panic("Could not borrow reference to the owner's Vault!")
 
     // Withdraw tokens from the signer's stored vault
@@ -22,7 +22,7 @@ transaction(amount: UFix64, to: Address) {
 
     // Get a reference to the recipient's Receiver
     let receiverRef = recipient
-      .getCapability(xEmuToken/xEmuTokenVaultStoragePath)!
+      .getCapability(xEmuToken.xEmuTokenReceiverPublicPath)!
       .borrow<&{FungibleToken.Receiver}>()
       ?? panic("Could not borrow receiver reference to the recipient's Vault")
 
