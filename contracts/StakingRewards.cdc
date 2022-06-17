@@ -786,6 +786,6 @@ pub contract StakingRewards {
         self.account.save(<-create Admin(), to: self.AdminStoragePath)
 
         self.mockTime = false
-        self.mockTimestamp = 0.0
+        self.mockTimestamp = 1.0
     }
 }
