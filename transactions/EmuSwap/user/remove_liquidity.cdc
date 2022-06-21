@@ -2,7 +2,7 @@ import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
 import EmuToken from "../../../contracts/EmuToken.cdc"
 import FUSD from "../../../contracts/dependencies/FUSD.cdc"
-import EmuSwap from "../../../contracts//EmuSwap.cdc"
+import EmuSwap from "../../../contracts/EmuSwap.cdc"
 
 transaction(fromPool: UInt64, amount: UFix64, storageIdentifierA: String, storageIdentifierB: String) {
   // LP Tokens Collection ref

@@ -4,7 +4,7 @@
 
 import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
-import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
+import EmuSwap from "../../../contracts/EmuSwap.cdc"
 import EmuToken from "../../../contracts/EmuToken.cdc"
 import StakingRewards from "../../../contracts/StakingRewards.cdc"
 

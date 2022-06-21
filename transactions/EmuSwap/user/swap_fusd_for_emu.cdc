@@ -2,7 +2,7 @@ import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
 import EmuToken from "../../../contracts/EmuToken.cdc"
 import FUSD from "../../../contracts/dependencies/FUSD.cdc"
-import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
+import EmuSwap from "../../../contracts/EmuSwap.cdc"
 
 // swap_flow_for_fusd
 
@@ -13,7 +13,7 @@ transaction(amountIn: UFix64) {
 
   prepare(signer: AuthAccount) {
     self.emuTokenVaultRef = signer.borrow<&EmuToken.Vault>(from: EmuToken.EmuTokenStoragePath)
-      ?? panic("Could not borrow a reference to EMU Vault")
+      ?? panic("Could not borrow a reference to FLOW Vault")
 
     if signer.borrow<&FUSD.Vault>(from: /storage/fusdVault) == nil {
       // Create a new FUSD Vault and put it in storage
@@ -39,10 +39,10 @@ transaction(amountIn: UFix64) {
   }
 
   execute {    
-    let token1Vault <- self.emuTokenVaultRef.withdraw(amount: amountIn) as! @EmuToken.Vault
+    let token2Vault <- self.fusdVaultRef.withdraw(amount: amountIn) as! @FUSD.Vault
 
-    let token2Vault <- EmuSwap.borrowPool(id: 1)?.swapToken1ForToken2!(from: <-token1Vault)
+    let token1Vault <- EmuSwap.borrowPool(id: 1)?.swapToken2ForToken1!(from: <-token2Vault)
 
-    self.fusdVaultRef.deposit(from: <- token2Vault)
+    self.emuTokenVaultRef.deposit(from: <- token1Vault)
   }
 }

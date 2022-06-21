@@ -2,7 +2,7 @@
 //
 // Updates the Fee for LP Providers
 
-import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
+import EmuSwap from "../../../contracts/EmuSwap.cdc"
 
 transaction(id: UInt64, feePercentage: UFix64) {
 

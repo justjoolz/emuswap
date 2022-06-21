@@ -1,4 +1,4 @@
-import EmuSwap from "../contracts/exchange/EmuSwap.cdc"
+import EmuSwap from "../contracts/EmuSwap.cdc"
 
 pub fun main() {
     EmuSwap.getPoolIDs()

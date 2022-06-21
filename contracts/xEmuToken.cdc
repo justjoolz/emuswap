@@ -15,7 +15,7 @@
 
 import FungibleToken from "./dependencies/FungibleToken.cdc"
 import EmuToken from "./EmuToken.cdc"
-import EmuSwap from "./exchange/EmuSwap.cdc"
+import EmuSwap from "./EmuSwap.cdc"
 pub contract xEmuToken: FungibleToken {
 
     access(contract) var emuPool: @FungibleToken.Vault

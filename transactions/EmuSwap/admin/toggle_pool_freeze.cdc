@@ -1,6 +1,6 @@
 // freeze_pool
 
-import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
+import EmuSwap from "../../../contracts/EmuSwap.cdc"
 
 transaction(id: UInt64) {
 
