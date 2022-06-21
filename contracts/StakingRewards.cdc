@@ -38,6 +38,7 @@ pub contract StakingRewards {
     // Paths
     pub let AdminStoragePath: StoragePath
     pub let CollectionStoragePath: StoragePath
+    pub let CollectionPublicPath: PublicPath
 
     // Events
     pub event NewFarmCreated(farmID: UInt64)
@@ -536,10 +537,15 @@ pub contract StakingRewards {
 
     }
 
+    pub resource interface StakeControllerCollectionPublic {
+        pub fun getIDs(): [UInt64]
+        pub fun getStakeMeta(id: UInt64): StakeInfo
+    }
+
     // Stake Controller Collection
     //
     //
-    pub resource StakeControllerCollection { 
+    pub resource StakeControllerCollection: StakeControllerCollectionPublic { 
         pub var ownedStakeControllers: @{UInt64:StakeController}
 
         pub fun deposit(stakeController: @StakeController) {
@@ -551,12 +557,18 @@ pub contract StakingRewards {
             emit StakingControllerDeposited(to: self.owner?.address!, farmID: farmID)
         }
 
-        pub fun withdraw(id: UInt64): @StakeController? {
-            return <- self.ownedStakeControllers.remove(key: id)
-        }
-
         pub fun borrow(id: UInt64): &StakeController? {
             return &self.ownedStakeControllers[id] as &StakeController?
+        }
+
+        pub fun getIDs(): [UInt64] {
+            return self.ownedStakeControllers.keys
+        }
+
+        pub fun getStakeMeta(id: UInt64): StakeInfo {
+            let farmRef = &StakingRewards.farmsByID[id] as &Farm?
+            let controllerRef = &self.ownedStakeControllers[id] as &StakeController?
+            return StakeInfo( controllerRef!.borrowStake(), farm: farmRef!)
         }
 
         init() {
@@ -785,6 +797,7 @@ pub contract StakingRewards {
         
         self.AdminStoragePath = /storage/EmuStakingRewardsAdmin
         self.CollectionStoragePath = /storage/EmuStakingRewardsCollection
+        self.CollectionPublicPath = /public/EmuStakingRewardsCollection
 
         destroy self.account.load<@AnyResource>(from: self.AdminStoragePath)
         self.account.save(<-create Admin(), to: self.AdminStoragePath)
