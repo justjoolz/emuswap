@@ -467,11 +467,11 @@ pub contract EmuSwap: FungibleTokens {
             return <- self.token2.withdraw(amount: self.token2.balance)
         }
 
-        // returns identifiers with ".Vault" from "A.f8d6e0586b0a20c7.FUSD.Vault"
+        // returns identifiers without ".Vault" from "A.f8d6e0586b0a20c7.FUSD.Vault"
         pub fun getIdentifiers(): [String] {
             let ids = [self.token1.getType().identifier, self.token2.getType().identifier]
-            ids[0] = ids[0].slice(from: 0, upTo: ids[0].length - 6)
-            ids[1] = ids[1].slice(from: 0, upTo: ids[1].length - 6)
+            ids[0] = EmuSwap.sliceVaultFromString(ids[0])
+            ids[1] = EmuSwap.sliceVaultFromString(ids[1])
             return ids
         }
 
@@ -622,11 +622,13 @@ pub contract EmuSwap: FungibleTokens {
     }
 
     pub fun getPoolIDFromIdentifiers(token1: String, token2: String): UInt64? {
-        let token1ToToken2Exists = EmuSwap.poolsMap.containsKey(token1) && EmuSwap.poolsMap[token1]!.containsKey(token2) 
-        let token2ToToken1Exists = EmuSwap.poolsMap.containsKey(token2) && EmuSwap.poolsMap[token2]!.containsKey(token1) 
+        let token1short = EmuSwap.sliceVaultFromString(token1)
+        let token2short = EmuSwap.sliceVaultFromString(token2)
+        let token2ToToken1Exists = EmuSwap.poolsMap.containsKey(token2short) && EmuSwap.poolsMap[token2short]!.containsKey(token1short) 
+        let token1ToToken2Exists = EmuSwap.poolsMap.containsKey(token1short) && EmuSwap.poolsMap[token1short]!.containsKey(token2short) 
 
         if token1ToToken2Exists && token2ToToken1Exists {
-            return self.poolsMap[token1]![token2]!
+            return self.poolsMap[token1short]![token2short]!
         } else {
             return nil
         }
@@ -747,6 +749,10 @@ pub contract EmuSwap: FungibleTokens {
         }
 
         return at
+    }
+
+    pub fun sliceVaultFromString(_ identifier: String): String {
+        return identifier.slice(from: 0, upTo: identifier.length - 6)
     }
     
     // Contract Initalization
