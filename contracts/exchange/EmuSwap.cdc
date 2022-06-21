@@ -75,7 +75,7 @@ pub contract EmuSwap: FungibleTokens {
     
     // j00lz add Pool creation details (how is this different from new LP token creation?)
     pub event NewSwapPoolCreated()
-    
+    pub event PoolIsFrozen(id: UInt64, isFrozen: Bool)
     pub event FeesDeposited(tokenIdentifier: String, amount: UFix64)
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -346,6 +346,7 @@ pub contract EmuSwap: FungibleTokens {
         //
         access(contract) fun togglePoolFreeze() {
             self.isFrozen = !self.isFrozen
+            emit PoolIsFrozen(id: self.ID, isFrozen: self.isFrozen)
         }
 
         access(contract) fun setDAOFeePercentage(_ feePercentage: UFix64) {
