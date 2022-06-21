@@ -42,6 +42,7 @@ pub contract StakingRewards {
     // Events
     pub event NewFarmCreated(farmID: UInt64)
     pub event EmissionRateUpdated(newRate: UFix64)
+    pub event RewardPoolCreated(id: UInt64)
     pub event TokensStaked(address: Address, poolID: UInt64, amountStaked: UFix64, totalStaked: UFix64)
     pub event TokensUnstaked(address: Address, amountUnstaked: UFix64, totalStaked: UFix64)
     pub event RewardsClaimed(address: Address, tokenType: String, amountClaimed: UFix64, rewardDebt: Fix64, totalRemaining: UFix64)
@@ -589,7 +590,7 @@ pub contract StakingRewards {
                 let farmRef = (&StakingRewards.farmsByID[id] as &Farm?)!
                 farmRef.initPool(poolID: poolID)
             }
-            // emit RewardPoolCreated() // j00lz 2do
+            emit RewardPoolCreated(id: poolID)
         }
 
         // fun deposit reward tokens
