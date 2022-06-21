@@ -2,7 +2,10 @@ module swap.emudao.org/test-overflow
 
 go 1.18
 
-require github.com/bjartek/overflow v0.0.0-20220610053455-82230094dfbc
+require (
+	github.com/bjartek/overflow v0.0.0-20220610053455-82230094dfbc
+	github.com/stretchr/testify v1.7.2
+)
 
 require (
 	cloud.google.com/go v0.100.2 // indirect
@@ -96,9 +99,11 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.10.1 // indirect
-	github.com/stretchr/testify v1.7.2 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/thoas/go-funk v0.9.2 // indirect
+	github.com/tidwall/gjson v1.14.1 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/turbolent/prettier v0.0.0-20210613180524-3a3f5a5b49ba // indirect
 	github.com/uber/jaeger-client-go v2.29.1+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
