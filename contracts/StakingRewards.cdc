@@ -2,7 +2,7 @@ import NonFungibleToken from "./dependencies/NonFungibleToken.cdc"
 import FungibleToken from "./dependencies/FungibleToken.cdc"
 import FungibleTokens from "./dependencies/FungibleTokens.cdc"
 import EmuToken from "./EmuToken.cdc"
-import EmuSwap from "./exchange/EmuSwap.cdc"
+import EmuSwap from "./EmuSwap.cdc"
 
 // Liquidity Mining
 //
