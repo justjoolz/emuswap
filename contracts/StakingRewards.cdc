@@ -42,7 +42,7 @@ pub contract StakingRewards {
     // Events
     pub event NewFarmCreated(farmID: UInt64)
     pub event EmissionRateUpdated(newRate: UFix64)
-    pub event TokensStaked(address: Address, amountStaked: UFix64, totalStaked: UFix64)
+    pub event TokensStaked(address: Address, poolID: UInt64, amountStaked: UFix64, totalStaked: UFix64)
     pub event TokensUnstaked(address: Address, amountUnstaked: UFix64, totalStaked: UFix64)
     pub event RewardsClaimed(address: Address, tokenType: String, amountClaimed: UFix64, rewardDebt: Fix64, totalRemaining: UFix64)
 
@@ -269,7 +269,7 @@ pub contract StakingRewards {
                 // update Farm total staked
                 self.totalStaked = self.totalStaked + amountStaked
 
-                emit TokensStaked(address: lpTokensReceiverCap.address, amountStaked: amountStaked, totalStaked: self.totalStaked)
+                emit TokensStaked(address: lpTokensReceiverCap.address, poolID: id, amountStaked: amountStaked, totalStaked: self.totalStaked)
 
                 // return stake controller for user to access their tokens
                 return <- create StakeController(id: id) // id needs to be unique per user and per Farm
@@ -300,7 +300,7 @@ pub contract StakingRewards {
                     }
                 }
 
-                emit TokensStaked(address: lpTokensReceiverCap.address, amountStaked: amountStaked, totalStaked: self.totalStaked)
+                emit TokensStaked(address: lpTokensReceiverCap.address, poolID: id, amountStaked: amountStaked, totalStaked: self.totalStaked)
                 return nil // no need to give them a new StakeController
             }           
         }
