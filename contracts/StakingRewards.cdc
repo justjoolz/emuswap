@@ -43,6 +43,7 @@ pub contract StakingRewards {
     pub event NewFarmCreated(farmID: UInt64)
     pub event EmissionRateUpdated(newRate: UFix64)
     pub event RewardPoolCreated(id: UInt64)
+    pub event StakingControllerDeposited(to: Address, farmID: UInt64)
     pub event TokensStaked(address: Address, poolID: UInt64, amountStaked: UFix64, totalStaked: UFix64)
     pub event TokensUnstaked(address: Address, amountUnstaked: UFix64, totalStaked: UFix64)
     pub event RewardsClaimed(address: Address, tokenType: String, amountClaimed: UFix64, rewardDebt: Fix64, totalRemaining: UFix64)
@@ -545,7 +546,9 @@ pub contract StakingRewards {
             pre {
                 self.ownedStakeControllers[stakeController.farmID] == nil : "Cannot have multiple controllers for same farm!"
             }
-            self.ownedStakeControllers[stakeController.farmID] <-! stakeController
+            let farmID = stakeController.farmID
+            self.ownedStakeControllers[farmID] <-! stakeController
+            emit StakingControllerDeposited(to: self.owner?.address!, farmID: farmID)
         }
 
         pub fun withdraw(id: UInt64): @StakeController? {
