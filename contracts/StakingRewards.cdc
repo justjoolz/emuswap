@@ -671,6 +671,7 @@ pub contract StakingRewards {
         pub let farmWeightsByID: {UInt64: UFix64}
         pub let rewardTokensPerSecondByID: {UInt64: UFix64}
         pub let totalAccumulatedTokensPerShareByID: {UInt64: UFix64}
+        pub let rewardsRemainingByID: {UInt64: UFix64}
 
         init(_ farmRef: &Farm) {
             self.id = farmRef.emuSwapPoolID
@@ -680,12 +681,14 @@ pub contract StakingRewards {
             self.farmWeightsByID = {}
             self.rewardTokensPerSecondByID = {}
             self.totalAccumulatedTokensPerShareByID = {}
+            self.rewardsRemainingByID = {}
 
             for poolID in StakingRewards.rewardPoolsByID.keys {
                 let rewardPoolRef = (&StakingRewards.rewardPoolsByID[poolID] as &RewardPool?)!
                 self.farmWeightsByID[poolID] = rewardPoolRef.farmWeightsByID[self.id]!
                 self.rewardTokensPerSecondByID[poolID] = rewardPoolRef.emissionDetails.getCurrentEmissionRate(genesisTS: rewardPoolRef.rewardsGenesisTimestamp)
                 self.totalAccumulatedTokensPerShareByID[poolID] = farmRef.totalAccumulatedTokensPerShareByRewardPoolID[poolID]
+                self.rewardsRemainingByID[poolID] = rewardPoolRef.vault.balance
             }
         }        
     }
