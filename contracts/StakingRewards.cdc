@@ -425,7 +425,9 @@ pub contract StakingRewards {
         access(contract) var rewardsReceiverCaps: {UInt64: Capability<&{FungibleToken.Receiver}>}
 
         init(lpTokens: @FungibleTokens.TokenVault, rewardDebt: {UInt64: Fix64}, lpTokenReceiverCap: Capability<&{FungibleTokens.CollectionPublic}>, rewardsReceiverCaps: [Capability<&{FungibleToken.Receiver}>], nfts: @[NonFungibleToken.NFT], nftReceiverCaps: [Capability<&{NonFungibleToken.CollectionPublic}>]) {
-            self.lpTokenVault <- lpTokens
+            self.lpTokenVault <- EmuSwap.createEmptyTokenVault(tokenID: lpTokens.tokenID)
+            self.lpTokenVault.deposit(from: <- lpTokens) // now we have deposit event but with no owner address
+
             self.lpTokenReceiverCap = lpTokenReceiverCap
 
             self.rewardsReceiverCaps = {}
