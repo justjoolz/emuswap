@@ -42,7 +42,7 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
         ?? panic("Could not borrow a reference to fusd Vault")
 
     // Create new Pool Vault 
-    self.lpTokenVault <-EmuSwap.createEmptyTokenVault(tokenID: EmuSwap.nextPoolID) //to: EmuSwap.LPTokensStoragePath
+    self.lpTokenVault <-EmuSwap.createEmptyTokenVault(tokenID: EmuSwap.getNextPoolID()) //to: EmuSwap.LPTokensStoragePath
     
     // check if Collection is created if not then create
     if signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath) == nil {
