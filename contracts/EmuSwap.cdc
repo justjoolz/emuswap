@@ -638,7 +638,10 @@ pub contract EmuSwap: FungibleTokens {
         }
     }
 
-    // j00lz todo add these to metadata format... 
+    pub fun getNextPoolID(): UInt64 {
+        return self.nextPoolID
+    }
+
     pub fun getLPFeePercentage(): UFix64 {
         return self.LPFeePercentage
     }
