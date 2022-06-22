@@ -12,6 +12,7 @@ import FungibleTokens from "./dependencies/FungibleTokens.cdc"
 import MetadataViews from "./dependencies/MetadataViews.cdc"
 
 pub contract EmuSwap: FungibleTokens {
+    access(contract) var PRECISION: UFix64
   
     // Pools kept here and only accessible via the contract (could make account to allow for future ideas?)
     access(contract) var poolsByID: @{UInt64: Pool}
@@ -304,8 +305,8 @@ pub contract EmuSwap: FungibleTokens {
             assert(token2Vault.balance > 0.0, message: "Empty token2 vault")
 
             // shift decimal 4 places to avoid truncation error
-            let token1Percentage: UFix64 = (token1Vault.balance * 10000.0) / self.token1Vault?.balance!
-            let token2Percentage: UFix64 = (token2Vault.balance * 10000.0) / self.token2Vault?.balance!
+            let token1Percentage: UFix64 = (token1Vault.balance * EmuSwap.PRECISION) / self.token1Vault?.balance!
+            let token2Percentage: UFix64 = (token2Vault.balance * EmuSwap.PRECISION) / self.token2Vault?.balance!
 
             // final liquidity token minted is the smaller between token1Liquidity and token2Liquidity
             // to maximize profit, user should add liquidity propotional to current liquidity
@@ -317,7 +318,7 @@ pub contract EmuSwap: FungibleTokens {
             self.token1Vault?.deposit!(from: <- token1Vault)
             self.token2Vault?.deposit!(from: <- token2Vault)
 
-            return <- EmuSwap.mintTokens(tokenID: self.ID, amount: (EmuSwap.totalSupplyByID[0]! * liquidityPercentage) / 10000.0)
+            return <- EmuSwap.mintTokens(tokenID: self.ID, amount: (EmuSwap.totalSupplyByID[self.ID]! * liquidityPercentage) / EmuSwap.PRECISION)
         }
 
         // Remove Liquidity
@@ -330,15 +331,14 @@ pub contract EmuSwap: FungibleTokens {
                 from.balance < EmuSwap.totalSupplyByID[self.ID]!: "Cannot remove all liquidity"
             }
 
-            // shift decimal 4 places to avoid truncation error
-            let liquidityPercentage = (from.balance * 10000.0) / EmuSwap.totalSupplyByID[0]!
+            let liquidityPercentage = (from.balance * EmuSwap.PRECISION) / EmuSwap.totalSupplyByID[self.ID]!
 
             assert(liquidityPercentage > 0.0, message: "Insufficient Liquidity")
 
             // Burn liquidity tokens and withdraw tokens to bundle
             EmuSwap.burnTokens(from: <- from)
-            let token1Vault <- self.token1Vault?.withdraw(amount: (self.token1Vault?.balance! * liquidityPercentage) / 10000.0)!
-            let token2Vault <- self.token2Vault?.withdraw(amount: (self.token2Vault?.balance! * liquidityPercentage) / 10000.0)!
+            let token1Vault <- self.token1Vault?.withdraw(amount: (self.token1Vault?.balance! * liquidityPercentage) / EmuSwap.PRECISION)!
+            let token2Vault <- self.token2Vault?.withdraw(amount: (self.token2Vault?.balance! * liquidityPercentage) / EmuSwap.PRECISION)!
 
             return <- EmuSwap.createTokenBundle(fromToken1: <- token1Vault, fromToken2: <- token2Vault)
         }
@@ -763,6 +763,7 @@ pub contract EmuSwap: FungibleTokens {
     // Sets up fees, paths and stores Admin resource to storage
     //  
     init() {
+        self.PRECISION = 10000.0
         self.totalSupplyByID = {}
         self.poolsByID <- {}
         self.poolsMap = {}
