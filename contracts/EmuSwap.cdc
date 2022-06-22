@@ -26,7 +26,7 @@ pub contract EmuSwap: FungibleTokens {
     access(contract) var feesByIdentifier: @{String: FungibleToken.Vault}
 
     //  unique ID for each pool
-    pub var nextPoolID: UInt64
+    access(contract) var nextPoolID: UInt64
     access(contract) var LPFeePercentage: UFix64
     access(contract) var DAOFeePercentage: UFix64
 
