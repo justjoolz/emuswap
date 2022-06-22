@@ -758,8 +758,11 @@ pub contract EmuSwap: FungibleTokens {
         return at
     }
 
+    // slice if present if not present don't!
     pub fun sliceVaultFromString(_ identifier: String): String {
-        return identifier.slice(from: 0, upTo: identifier.length - 6)
+        if identifier.slice(from:identifier.length-6, upTo: identifier.length) == ".Vault" { 
+        return identifier.slice(from: 0, upTo: identifier.length - 6) }
+        return identifier
     }
     
     // Contract Initalization
