@@ -101,9 +101,6 @@ require (
 	github.com/spf13/viper v1.10.1 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/thoas/go-funk v0.9.2 // indirect
-	github.com/tidwall/gjson v1.14.1 // indirect
-	github.com/tidwall/match v1.1.1 // indirect
-	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/turbolent/prettier v0.0.0-20210613180524-3a3f5a5b49ba // indirect
 	github.com/uber/jaeger-client-go v2.29.1+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
