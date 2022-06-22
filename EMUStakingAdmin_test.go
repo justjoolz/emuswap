@@ -20,7 +20,7 @@ func TestCreateNewFarm(t *testing.T) {
 
 	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
 
-	farmID := uint64(0)
+	farmID := getNextPoolID(o)
 	// SIGNER_ADDRESS := "0xf8d6e0586b0a20c7"
 
 	testCreateNewFarm(o, t, 0)
@@ -87,9 +87,13 @@ func testCreateRewardPool(o *overflow.Overflow, t *testing.T,
 	amount float64) {
 
 	nftsAccepted := []string{} // []string{"ExampleNFTCollection", "ExampleNFT2Collection"}
+	signer := "account"
+	EVENT_EXPECTED := storagePathToTokenIdentifier(vaultIdentifier)
+	AMOUNT_EXPECTED := float64ToUFix64String(amount)
+	SIGNER_ADDRESS := "0x" + o.Account(signer).Address().String()
 
 	o.ScriptFromFile("")
-	o.TransactionFromFile("/Staking/admin/create_reward_pool").SignProposeAndPayAs("account").
+	o.TransactionFromFile("/Staking/admin/create_reward_pool").SignProposeAndPayAs(signer).
 		Args(o.
 			Arguments().
 			String(vaultIdentifier).
@@ -97,10 +101,10 @@ func testCreateRewardPool(o *overflow.Overflow, t *testing.T,
 			StringArray(nftsAccepted...)).
 		Test(t).
 		AssertSuccess().
-		// AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.FUSD.TokensWithdrawn", map[string]interface{}{
-		// 	"amount": "100.00000000",
-		// 	"from":   "0xf8d6e0586b0a20c7",
-		// })).
+		AssertEmitEvent(overflow.NewTestEvent(EVENT_EXPECTED+".TokensWithdrawn", map[string]interface{}{
+			"amount": AMOUNT_EXPECTED,
+			"from":   SIGNER_ADDRESS,
+		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.StakingRewards.RewardPoolCreated", map[string]interface{}{
 			"id": "1",
 		})).

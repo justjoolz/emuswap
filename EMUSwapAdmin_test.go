@@ -20,11 +20,15 @@ func TestCreateNewPoolFlowFusd(t *testing.T) {
 	setupFUSDVaultWithBalance(o, "user1", 1000.0)
 	setupFUSDVaultWithBalance(o, "user2", 1000.0)
 
+	poolID := getNextPoolID(o)
+
 	flowAmount := 100.0
 	fusdAmount := 2.5
+
 	FLOW_AMOUNT := fmt.Sprintf("%.8f", flowAmount)
 	FUSD_AMOUNT := fmt.Sprintf("%.8f", fusdAmount)
 	SIGNER_ADDRESS := "0xf8d6e0586b0a20c7"
+	TOKEN_ID := fmt.Sprintf("%d", poolID)
 
 	o.TransactionFromFile("/EmuSwap/admin/create_new_pool_FLOW_FUSD").SignProposeAndPayAs("account").
 		Args(o.
@@ -42,9 +46,7 @@ func TestCreateNewPoolFlowFusd(t *testing.T) {
 			"from":   SIGNER_ADDRESS,
 		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.TokensInitialized", map[string]interface{}{
-			// "tokenA":  "",
-			// "tokenB":  "",
-			"tokenID": "0",
+			"tokenID": TOKEN_ID,
 		})).
 		// ?
 		AssertEmitEvent(overflow.NewTestEvent("A.0ae53cb6e3f42a79.FlowToken.TokensWithdrawn", map[string]interface{}{
@@ -57,11 +59,15 @@ func TestCreateNewPoolFlowFusd(t *testing.T) {
 		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.TokensMinted", map[string]interface{}{
 			"amount":  "1.00000000",
-			"tokenID": "0",
+			"tokenID": TOKEN_ID,
 		})).
-		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.NewSwapPoolCreated", map[string]interface{}{})).
+		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.NewSwapPoolCreated", map[string]interface{}{
+			"poolID": TOKEN_ID,
+			"tokenA": "A.0ae53cb6e3f42a79.FlowToken",
+			"tokenB": "A.f8d6e0586b0a20c7.FUSD",
+		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.PoolIsFrozen", map[string]interface{}{
-			"id":       "0",
+			"id":       TOKEN_ID,
 			"isFrozen": "false",
 		})).
 		// AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.TokensDeposited", map[string]interface{}{
@@ -73,7 +79,6 @@ func TestCreateNewPoolFlowFusd(t *testing.T) {
 }
 
 func TestCreateNewPoolEmuFusd(t *testing.T) {
-
 	o := overflow.NewTestingEmulator().Start()
 
 	mintFlowTokens(o, "account", 1000.0)
@@ -91,6 +96,7 @@ func TestCreateNewPoolEmuFusd(t *testing.T) {
 	EMU_AMOUNT := fmt.Sprintf("%.8f", emuAmount)
 	FUSD_AMOUNT := fmt.Sprintf("%.8f", fusdAmount)
 	SIGNER_ADDRESS := "0xf8d6e0586b0a20c7"
+	POOL_ID := fmt.Sprintf("%d", getNextPoolID(o))
 
 	o.TransactionFromFile("/EmuSwap/admin/create_new_pool_EMU_FUSD").SignProposeAndPayAs("account").
 		Args(o.
@@ -108,7 +114,7 @@ func TestCreateNewPoolEmuFusd(t *testing.T) {
 			"from":   SIGNER_ADDRESS,
 		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.TokensInitialized", map[string]interface{}{
-			"tokenID": "0",
+			"tokenID": POOL_ID,
 		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuToken.TokensWithdrawn", map[string]interface{}{
 			"amount": EMU_AMOUNT,
@@ -120,11 +126,15 @@ func TestCreateNewPoolEmuFusd(t *testing.T) {
 		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.TokensMinted", map[string]interface{}{
 			"amount":  "1.00000000",
-			"tokenID": "0",
+			"tokenID": POOL_ID,
 		})).
-		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.NewSwapPoolCreated", map[string]interface{}{})).
+		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.NewSwapPoolCreated", map[string]interface{}{
+			"poolID": POOL_ID,
+			"tokenA": "A.f8d6e0586b0a20c7.EmuToken",
+			"tokenB": "A.f8d6e0586b0a20c7.FUSD",
+		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.PoolIsFrozen", map[string]interface{}{
-			"id":       "0",
+			"id":       POOL_ID,
 			"isFrozen": "false",
 		})).
 		//
@@ -156,7 +166,9 @@ func TestCreateNewPool(t *testing.T) {
 	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
 }
 
-func testCreatePool(o *overflow.Overflow, t *testing.T, token1identifier string, token1Amount float64, token2identifier string, token2Amount float64) {
+func testCreatePool(o *overflow.Overflow, t *testing.T, token1identifier string, token1Amount float64, token2identifier string, token2Amount float64) uint64 {
+	ids := getPoolIDs(o)
+	TOKEN_ID := fmt.Sprintf("%d", len(ids))
 	o.TransactionFromFile("/EmuSwap/admin/create_new_pool").SignProposeAndPayAs("account").
 		Args(o.
 			Arguments().
@@ -167,13 +179,19 @@ func testCreatePool(o *overflow.Overflow, t *testing.T, token1identifier string,
 		Test(t).
 		AssertSuccess().
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.TokensInitialized", map[string]interface{}{
-			"tokenID": "0",
+			"tokenID": TOKEN_ID,
 		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.TokensMinted", map[string]interface{}{
 			"amount":  "1.00000000",
-			"tokenID": "0",
+			"tokenID": TOKEN_ID,
 		})).
-		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.NewSwapPoolCreated", map[string]interface{}{}))
+		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.NewSwapPoolCreated", map[string]interface{}{
+			"poolID": TOKEN_ID,
+			"tokenA": "A.0ae53cb6e3f42a79.FlowToken",
+			"tokenB": "A.f8d6e0586b0a20c7.FUSD",
+		}))
+
+	return uint64(len(ids))
 }
 
 /*

@@ -502,6 +502,39 @@ func TestStory(t *testing.T) {
 	// assert.Equal(t, user1Claimed-roundFloat(user2Claimed/factor), 0.0)
 }
 
+func TestAddRewardReceiver(t *testing.T) {
+	o := overflow.NewTestingEmulator().Start()
+
+	setupFUSDVaultWithBalance(o, "account", 100.0)
+	testCreatePool(o, t, "flowTokenVault", 100.0, "fusdVault", 100.0)
+
+	signer := "account"
+	farmID := uint64(0)
+	publicReceiver := "emuTokenReceiver"
+	storagePath := "emuTokenVault"
+
+	testCreateNewFarm(o, t, 0)
+	testFirstStake(o, t, signer, farmID, 1.0)
+	testAddRewardReceiver(o, t, signer, farmID, publicReceiver, storagePath)
+}
+
+func testAddRewardReceiver(o *overflow.Overflow, t *testing.T,
+	signer string,
+
+	farmID uint64,
+	publicReceiver string,
+	storagePath string) {
+	o.TransactionFromFile("Staking/user/add_reward_receiver").SignProposeAndPayAs(signer).
+		Args(o.
+			Arguments().
+			UInt64(farmID).
+			String(publicReceiver).
+			String(storagePath)).
+		Test(t).
+		AssertSuccess().
+		AssertEventCount(0)
+}
+
 type StakesInfo struct {
 	Stakes map[string]StakeInfo
 }
