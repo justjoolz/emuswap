@@ -4,7 +4,7 @@ import EmuToken from "../../../contracts/EmuToken.cdc"
 import FUSD from "../../../contracts/dependencies/FUSD.cdc"
 import EmuSwap from "../../../contracts/EmuSwap.cdc"
 
-transaction(fromPool: UInt64, amount: UFix64, storageIdentifierA: String, storageIdentifierB: String) {
+transaction(amount: UFix64, storageIdentifierA: String, storageIdentifierB: String) {
   // LP Tokens Collection ref
   let lpTokensCollection: &EmuSwap.Collection
 
@@ -19,6 +19,17 @@ transaction(fromPool: UInt64, amount: UFix64, storageIdentifierA: String, storag
   let vault2ref: &FungibleToken.Vault
 
   prepare(signer: AuthAccount) {
+    self.vault1ref = signer.borrow<&FungibleToken.Vault>(from: StoragePath(identifier: storageIdentifierA)!)
+     ?? panic("Could not borrow a reference to FungibleToken Vault: ".concat(storageIdentifierA))
+
+    self.vault2ref = signer.borrow<&FungibleToken.Vault>(from: StoragePath(identifier: storageIdentifierB)!)
+      ?? panic("Could not borrow a reference to FungibleToken Vault: ".concat(storageIdentifierB))
+
+    let token1Identifier = self.vault1ref.getType().identifier
+    let token2Identifier = self.vault2ref.getType().identifier
+   
+    let fromPool = EmuSwap.getPoolIDFromIdentifiers(token1: token1Identifier, token2: token2Identifier) ?? panic("Can't find swap pool for ".concat(token1Identifier).concat(" and ".concat(token2Identifier)))
+    
     self.lpTokensCollection = signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath)
       ?? panic("Could not borrow reference to signers LP Tokens collection")
 
@@ -27,11 +38,6 @@ transaction(fromPool: UInt64, amount: UFix64, storageIdentifierA: String, storag
     self.pool = EmuSwap.borrowPool(id: fromPool)
       ?? panic("Could not borrow pool")
 
-    self.vault1ref = signer.borrow<&FungibleToken.Vault>(from: StoragePath(identifier: storageIdentifierA)!)
-     ?? panic("Could not borrow a reference to FungibleToken Vault: ".concat(storageIdentifierA))
-
-    self.vault2ref = signer.borrow<&FungibleToken.Vault>(from: StoragePath(identifier: storageIdentifierB)!)
-      ?? panic("Could not borrow a reference to FungibleToken Vault: ".concat(storageIdentifierB))
   }
 
   execute {
