@@ -76,7 +76,7 @@ pub contract EmuSwap: FungibleTokens {
     pub event Swap(token1Amount: UFix64, token2Amount: UFix64, poolID: UInt64, direction: UInt8)
     
     // j00lz add Pool creation details (how is this different from new LP token creation?)
-    pub event NewSwapPoolCreated()
+    pub event NewSwapPoolCreated(poolID: UInt64, tokenA: String, tokenB: String)
 
     pub event PoolIsFrozen(id: UInt64, isFrozen: Bool)
     
@@ -567,8 +567,7 @@ pub contract EmuSwap: FungibleTokens {
             // increment ready for next new pool
             EmuSwap.nextPoolID = EmuSwap.nextPoolID + 1
             
-            // j00lz 2do add details to event
-            emit NewSwapPoolCreated()
+            emit NewSwapPoolCreated(poolID: lpTokens.tokenID, tokenA: token1, tokenB: token2)
 
             return <- lpTokens
         }
