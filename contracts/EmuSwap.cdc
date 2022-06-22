@@ -96,8 +96,10 @@ pub contract EmuSwap: FungibleTokens {
 
         pub let token1Identifier: String
         pub let token2Identifier: String
+        pub let totalSupply: UFix64
 
         init(poolRef: &Pool) {
+            self.totalSupply = EmuSwap.totalSupplyByID[poolRef.ID]!
             self.token1Amount = poolRef.token1Vault?.balance!
             self.token2Amount = poolRef.token2Vault?.balance!
             self.token1Identifier = poolRef.token1Vault.getType().identifier
