@@ -102,8 +102,8 @@ pub contract EmuSwap: FungibleTokens {
             self.totalSupply = EmuSwap.totalSupplyByID[poolRef.ID]!
             self.token1Amount = poolRef.token1Vault?.balance!
             self.token2Amount = poolRef.token2Vault?.balance!
-            self.token1Identifier = poolRef.token1Vault.getType().identifier
-            self.token2Identifier = poolRef.token2Vault.getType().identifier
+            self.token1Identifier = poolRef.token1Vault?.getType()!.identifier
+            self.token2Identifier = poolRef.token2Vault?.getType()!.identifier
             // poolRef.DAOFeePercentage
             // poolRef.LPFeePercentage
         }
@@ -551,7 +551,8 @@ pub contract EmuSwap: FungibleTokens {
 
             assert(token1 != token2, message: "Cannot create pool with identical tokens!")
             assert(EmuSwap.getPoolIDFromIdentifiers(token1: token1, token2: token2) == nil, message: "Pool already exists")
-            
+            assert(from.token1.balance != 0.0 && from.token2.balance != 0.0)
+
             // create new pool
             let newPool <- create Pool(DAOFeePercentage: EmuSwap.DAOFeePercentage, LPFeePercentage: EmuSwap.LPFeePercentage)
             
