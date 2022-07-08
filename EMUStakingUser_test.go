@@ -21,7 +21,7 @@ func TestAddLiquidityAndStake(t *testing.T) {
 	flowStoragePath := "flowTokenVault"
 	fusdStoragePath := "fusdVault"
 
-	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
+	testCreateSwapPool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
 
 	farmID := uint64(0)
 	testCreateNewFarm(o, t, farmID)
@@ -143,7 +143,7 @@ func TestStake(t *testing.T) {
 	flowStoragePath := "flowTokenVault"
 	fusdStoragePath := "fusdVault"
 
-	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
+	testCreateSwapPool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
 
 	farmID := uint64(0)
 	testCreateNewFarm(o, t, farmID)
@@ -288,7 +288,7 @@ func TestClaimRewards(t *testing.T) {
 	fusdStoragePath := "fusdVault"
 
 	// Create EmuSwap Pool
-	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
+	testCreateSwapPool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
 
 	farmID := uint64(0)
 	testCreateNewFarm(o, t, farmID)
@@ -403,64 +403,7 @@ func TestStory2EqualStakesShareEqualRewards(t *testing.T) {
 
 	// ADMIN
 	// Create EmuSwap Pool
-	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
-	testCreateNewFarm(o, t, farmID)
-	// testAddLiquidityAndStake(o, t, "account", 0, flowAmount, fusdAmount)
-
-	toggleMockTime(o, t)
-	updateMockTimestamp(o, t, 1.0)
-
-	addLiquidity(o, t, "user1", flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
-	// testAddLiquidityAndStake(o, t, "user1", 0, 100.0, 150.0)
-
-	lpAmount := 1.0
-	factor := 1.0
-	sessionLength := 100.0 // 60.0 * 60.0 * 24.0 // testing 2 session of staking
-
-	// both users stake (account stakes a fraction of user1)
-	testFirstStake(o, t, "account", farmID, lpAmount/factor)
-	testFirstStake(o, t, "user1", farmID, lpAmount)
-	// testStake(o, t, "user1", farmID, lpAmount)
-
-	// time.Sleep(1 * time.Second)
-	updateMockTimestamp(o, t, sessionLength) // even though we sleep we need to send a tx to bump the current block
-	// updateMockTimestamp(o, t, sessionLength) // even though we sleep we need to send a tx to bump the current block
-	// account stakes same amount again
-	// testStake(o, t, "account", farmID, lpAmount/factor)
-	// testStake(o, t, "user1", farmID, lpAmount*2)
-
-	// same amount of time elapses
-	// updateMockTimestamp(o, t, sessionLength) // event though we sleep we need to send a tx to bump the current block
-
-	publicReceiver := "emuTokenReceiver"
-	storagePath := "emuTokenVault"
-	// testAddRewardReceiver(o, t, "user1", farmID, publicReceiver, storagePath)
-	testAddRewardReceiver(o, t, "user1", farmID, publicReceiver, storagePath)
-
-	user1Claimed := claimRewards(o, t, "account", farmID)
-	user2Claimed := claimRewards(o, t, "user1", farmID)
-	assert.Equal(t, user1Claimed, roundFloat(user2Claimed/factor))
-	assert.Equal(t, user1Claimed/roundFloat(user2Claimed/factor), 1.0)
-	// assert.Equal(t, user2Claimed/roundFloat(user1Claimed/factor), 0.0)
-	// assert.Equal(t, user1Claimed-roundFloat(user2Claimed/factor), 0.0)
-}
-
-func TestStory(t *testing.T) {
-	o := overflow.NewTestingEmulator().Start()
-	testSetupEmuToken(o, t, "user1")
-	setupFUSDVaultWithBalance(o, "account", 1000.0)
-	setupFUSDVaultWithBalance(o, "user1", 1000.0)
-	mintFlowTokens(o, "user1", 1000.0)
-
-	flowAmount := 100.0
-	fusdAmount := 150.0
-	flowStoragePath := "flowTokenVault"
-	fusdStoragePath := "fusdVault"
-	farmID := uint64(0)
-
-	// ADMIN
-	// Create EmuSwap Pool
-	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
+	testCreateSwapPool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
 	testCreateNewFarm(o, t, farmID)
 	// testAddLiquidityAndStake(o, t, "account", 0, flowAmount, fusdAmount)
 
@@ -506,7 +449,7 @@ func TestAddRewardReceiver(t *testing.T) {
 	o := overflow.NewTestingEmulator().Start()
 
 	setupFUSDVaultWithBalance(o, "account", 100.0)
-	testCreatePool(o, t, "flowTokenVault", 100.0, "fusdVault", 100.0)
+	testCreateSwapPool(o, t, "flowTokenVault", 100.0, "fusdVault", 100.0)
 
 	signer := "account"
 	farmID := uint64(0)

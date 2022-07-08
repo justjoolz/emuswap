@@ -23,7 +23,7 @@ func TestAddLiquidity(t *testing.T) {
 	token1Amount := 100.0
 	token2Amount := 2.5
 
-	testCreatePool(o, t, token1StorageID, token1Amount, token2StorageID, token2Amount)
+	testCreateSwapPool(o, t, token1StorageID, token1Amount, token2StorageID, token2Amount)
 	addLiquidity(o, t, "account", token1StorageID, token1Amount, token2StorageID, token2Amount)
 	addLiquidity(o, t, "user1", token1StorageID, token1Amount, token2StorageID, token2Amount)
 }
@@ -41,7 +41,7 @@ func addLiquidity(
 	TOKEN_1_TYPE := storagePathToTokenIdentifier(token1StorageID)
 	TOKEN_2_TYPE := storagePathToTokenIdentifier(token2StorageID)
 
-	poolID := getNextPoolID(o)
+	poolID := getPoolIDFromTokenIDs(o, token1StorageID, token2StorageID)
 	// totalPoolLiquidity := 0.0
 
 	TOKEN_1_AMOUNT := fmt.Sprintf("%.8f", token1Amount)
@@ -103,7 +103,7 @@ func TestRemoveLiquidity(t *testing.T) {
 	token1Amount := 100.0
 	token2Amount := 150.0
 
-	testCreatePool(o, t, token1StorageID, token1Amount, token2StorageID, token2Amount)
+	testCreateSwapPool(o, t, token1StorageID, token1Amount, token2StorageID, token2Amount)
 	addLiquidity(o, t, "account", token1StorageID, token1Amount, token2StorageID, token2Amount)
 	addLiquidity(o, t, "user1", token1StorageID, token1Amount, token2StorageID, token2Amount)
 	amount := 0.1
@@ -216,12 +216,13 @@ func TestSwap(t *testing.T) {
 	token1Amount := 100.0
 	token2Amount := 150.0
 
-	testCreatePool(o, t, token1StorageID, token1Amount, token2StorageID, token2Amount)
+	testCreateSwapPool(o, t, token1StorageID, token1Amount, token2StorageID, token2Amount)
 	amount := 0.1
 
 	signer := "user1"
 
 	testSwap(o, t, signer, token1StorageID, token2StorageID, amount)
+	testSwap(o, t, signer, token2StorageID, token1StorageID, amount/2)
 }
 
 func testSwap(
@@ -233,14 +234,41 @@ func testSwap(
 	toTokenStorageIdentifier string,
 	amount float64,
 ) {
+	fmt.Println("~~~~~~~~~~~~~~~~~~!")
+	fmt.Println("| TESTING SWAP!!! |")
+	fmt.Println("~~~~~~~~~~~~~~~~~~!")
+	fmt.Println(" from " + fromTokenStorageIdentifier)
+	fmt.Println(" to   " + toTokenStorageIdentifier)
+
 	daoFee := getDAOFeePercentage(o)
 	lpFee := getLPFeePercentage(o)
 
 	poolID := getPoolIDfromTokenIDs(o, storagePathToTokenIdentifier(fromTokenStorageIdentifier), storagePathToTokenIdentifier(toTokenStorageIdentifier))
+	SIDE := getSide(o, storagePathToTokenIdentifier(fromTokenStorageIdentifier), storagePathToTokenIdentifier(toTokenStorageIdentifier))
+	fmt.Println(" Pool ID: " + fmt.Sprint(poolID) + " Side " + SIDE)
+
 	amountAfterFee := (1 - daoFee - lpFee) * amount
-	expectedB := getQuoteExactAtoB(o, poolID, amountAfterFee)
+
+	expectedB := float64(0)
+	TOKEN_1_KEY := ""
+	TOKEN_2_KEY := ""
+	if SIDE == "1" {
+		expectedB = getQuoteExactAtoB(o, poolID, amountAfterFee)
+		TOKEN_1_KEY = "token1Amount"
+		TOKEN_2_KEY = "token2Amount"
+	} else {
+		expectedB = getQuoteExactBtoA(o, poolID, amountAfterFee)
+		TOKEN_1_KEY = "token2Amount"
+		TOKEN_2_KEY = "token1Amount"
+	}
+
 	EXPECTED_TOKEN_AMOUNT_RETURNED := fmt.Sprintf("%.8f", expectedB)
 
+	// if fromTokenStorageIdentifier == "fusdVault" && toTokenStorageIdentifier == "emuTokenVault" {
+	// if toTokenStorageIdentifier == "emuTokenVault" {
+	// 	fmt.Println(getSide(o, fromTokenStorageIdentifier, toTokenStorageIdentifier))
+	// 	panic(poolID)
+	// }
 	// totalFee := (daoFee + lpFee) * amount
 	// let token1Amount = originalBalance * (1.0 - self.LPFeePercentage - self.DAOFeePercentage)
 	// let token2Amount = self.quoteSwapExactToken1ForToken2(amount: token1Amount)
@@ -259,6 +287,9 @@ func testSwap(
 
 	// TOKEN_ID := fmt.Sprintf("%d", 0) // (token1StorageID, token2StorageID)
 
+	TOKEN_IDENTIFIER_A := storagePathToTokenIdentifier(fromTokenStorageIdentifier)
+	TOKEN_IDENTIFIER_B := storagePathToTokenIdentifier(toTokenStorageIdentifier)
+
 	o.TransactionFromFile("EmuSwap/user/swap").SignProposeAndPayAs(signer).
 		Args(o.
 			Arguments().
@@ -267,11 +298,12 @@ func testSwap(
 			UFix64(amount)).
 		Test(t).
 		AssertSuccess().
-		AssertEmitEvent(overflow.NewTestEvent("A.0ae53cb6e3f42a79.FlowToken.TokensWithdrawn", map[string]interface{}{
+		// AssertEventCount(7). // 7 events if never collected fee before 8 if already have this fee type (this because we move <- whole fee deducted vault in first time and deposit into that thereafter) j00lz note
+		AssertEmitEvent(overflow.NewTestEvent(TOKEN_IDENTIFIER_A+".TokensWithdrawn", map[string]interface{}{
 			"amount": TOKEN_AMOUNT,
 			"from":   SIGNER_ADDRESS,
 		})).
-		AssertEmitEvent(overflow.NewTestEvent("A.0ae53cb6e3f42a79.FlowToken.TokensWithdrawn", map[string]interface{}{
+		AssertEmitEvent(overflow.NewTestEvent(TOKEN_IDENTIFIER_A+".TokensWithdrawn", map[string]interface{}{
 			"amount": DAO_FEE_AMOUNT,
 			"from":   "",
 		})).
@@ -279,24 +311,23 @@ func testSwap(
 			"amount":          DAO_FEE_AMOUNT,
 			"tokenIdentifier": FEE_TOKEN,
 		})).
-		AssertEmitEvent(overflow.NewTestEvent("A.0ae53cb6e3f42a79.FlowToken.TokensDeposited", map[string]interface{}{
+		AssertEmitEvent(overflow.NewTestEvent(TOKEN_IDENTIFIER_A+".TokensDeposited", map[string]interface{}{
 			"amount": MINUS_DAO_FEE,
 			"to":     CONTRACT_ADDRESS,
 		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.Trade", map[string]interface{}{
-			"side":         "1", // j00lz consider changing this
-			"token1Amount": AMOUNT_AFTER_FEE,
-			"token2Amount": EXPECTED_TOKEN_AMOUNT_RETURNED,
+			"side":      SIDE,
+			TOKEN_1_KEY: AMOUNT_AFTER_FEE,
+			TOKEN_2_KEY: EXPECTED_TOKEN_AMOUNT_RETURNED,
 		})).
-		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.FUSD.TokensWithdrawn", map[string]interface{}{
+		AssertEmitEvent(overflow.NewTestEvent(TOKEN_IDENTIFIER_B+".TokensWithdrawn", map[string]interface{}{
 			"amount": EXPECTED_TOKEN_AMOUNT_RETURNED,
 			"from":   CONTRACT_ADDRESS,
 		})).
-		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.FUSD.TokensDeposited", map[string]interface{}{
+		AssertEmitEvent(overflow.NewTestEvent(TOKEN_IDENTIFIER_B+".TokensDeposited", map[string]interface{}{
 			"amount": EXPECTED_TOKEN_AMOUNT_RETURNED,
 			"to":     SIGNER_ADDRESS,
-		})).
-		AssertEventCount(7)
+		}))
 }
 
 func getDAOFeePercentage(o *overflow.Overflow) float64 {
@@ -317,14 +348,34 @@ func getLPFeePercentage(o *overflow.Overflow) float64 {
 }
 
 func getPoolIDFromTokenIDs(o *overflow.Overflow, tokenID1 string, tokenID2 string) uint64 {
-	poolID := uint64(0)
+	var poolID json.Number
+	fmt.Println(tokenID1)
+	fmt.Println(tokenID2)
 	o.ScriptFromFile("/Staking/get_pool_id_from_token_ids").Args(o.Arguments().String(tokenID1).String(tokenID2)).RunMarshalAs(&poolID)
-	return poolID
+	// data := o.ScriptFromFile("/Staking/get_pool_id_from_token_ids").Args(o.Arguments().String(tokenID1).String(tokenID2)).RunReturnsJsonString()
+	// fmt.Println(data)
+	fmt.Println(poolID)
+	id, err := poolID.Int64()
+	if err != nil {
+		// panic(err)
+	}
+	fmt.Println(id)
+	return uint64(id)
 }
 
-func getPoolIDs(o *overflow.Overflow) []uint64 {
-	var poolIDs []uint64
-	o.ScriptFromFile("/Staking/get_pool_id_from_token_ids").RunMarshalAs(&poolIDs)
+func getNextPoolID(o *overflow.Overflow) uint64 {
+	return uint64(len(getPoolIDs(o)))
+}
+
+func getPoolIDs(o *overflow.Overflow) []string {
+	var poolIDs []string
+	err := o.ScriptFromFile("/get_pool_ids").RunMarshalAs(&poolIDs)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(poolIDs)
+	// o.ScriptFromFile("/Staking/get_pool_id_from_token_ids").RunMarshalAs(&poolIDs)
+	// fmt.Print(o.ScriptFromFile("/Staking/get_pool_id_from_token_ids").RunReturnsJsonString())
 	return poolIDs
 }
 
@@ -406,15 +457,33 @@ func getPoolIDfromTokenIDs(o *overflow.Overflow, token1identifier string, token2
 		panic(err)
 	}
 	r, _ := poolID.Int64()
+	// fmt.Println("------------> " + token1identifier + " -----> " + token2identifier + " ----> " + fmt.Sprint(r))
 	return uint64(r)
+}
+
+func getSide(o *overflow.Overflow, fromTokenIdentifier string, toTokenIdentifier string) string {
+	poolID := getPoolIDfromTokenIDs(o, (fromTokenIdentifier), (toTokenIdentifier))
+	meta := getPoolMeta(o, poolID)
+	r := ""
+
+	fmt.Println("getSide()")
+	fmt.Println(poolID)
+	fmt.Println(meta)
+	fmt.Println(fromTokenIdentifier)
+	fmt.Println(toTokenIdentifier)
+	fmt.Println(meta.Token1Identifier)
+	fmt.Println(meta.Token2Identifier)
+
+	if fromTokenIdentifier+".Vault" == meta.Token1Identifier {
+		r = "1"
+	} else if toTokenIdentifier+".Vault" == meta.Token1Identifier {
+		r = "2"
+	}
+	return r
 }
 
 func readFeesCollected(o *overflow.Overflow) map[string]json.Number {
 	var feesCollected map[string]json.Number
 	o.ScriptFromFile("read_fees_collected").RunMarshalAs(&feesCollected)
 	return feesCollected
-}
-
-func getNextPoolID(o *overflow.Overflow) uint64 {
-	return uint64(len(getPoolIDs(o)))
 }

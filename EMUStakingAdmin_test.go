@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Test Create New Farm
 func TestCreateNewFarm(t *testing.T) {
 	o := overflow.NewTestingEmulator().Start()
 	setupFUSDVaultWithBalance(o, "account", 1000.0)
@@ -18,10 +19,7 @@ func TestCreateNewFarm(t *testing.T) {
 	flowStoragePath := "flowTokenVault"
 	fusdStoragePath := "fusdVault"
 
-	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
-
-	farmID := getNextPoolID(o)
-	// SIGNER_ADDRESS := "0xf8d6e0586b0a20c7"
+	testCreateSwapPool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
 
 	testCreateNewFarm(o, t, 0)
 
@@ -37,23 +35,23 @@ func TestCreateNewFarm(t *testing.T) {
 	// assert.Equal(t, farmMeta.Stakes, "")
 	// assert.Equal(t, farmMeta.RewardTokensPerSecondByID, "")
 
-	/*
-		"A.f8d6e0586b0a20c7.StakingRewards.FarmMeta(
-			id: 0,
-			stakes: {},
-			totalStaked: 0.00000000,
-			lastRewardTimestamp: 1655367585.00000000,
-			farmWeightsByID: {0: 1.00000000, 1: 1.00000000},
-			rewardTokensPerSecondByID: {0: 1.00000000, 1: 1.00000000},
-			totalAccumulatedTokensPerShareByID: {1: 0.00000000, 0: 0.00000000})")
-	*/
+	// /*
+	// 	"A.f8d6e0586b0a20c7.StakingRewards.FarmMeta(
+	// 		id: 0,
+	// 		stakes: {},
+	// 		totalStaked: 0.00000000,
+	// 		lastRewardTimestamp: 1655367585.00000000,
+	// 		farmWeightsByID: {0: 1.00000000, 1: 1.00000000},
+	// 		rewardTokensPerSecondByID: {0: 1.00000000, 1: 1.00000000},
+	// 		totalAccumulatedTokensPerShareByID: {1: 0.00000000, 0: 0.00000000})")
+	// */
 
 	// no pending rewards
-	pendingRewards := o.ScriptFromFile("/Staking/get_pending_rewards").Args(o.Arguments().UInt64(farmID).Account("account")).RunReturnsJsonString() //  .RunMarshalAs(&farmMeta)
+	pendingRewards := o.ScriptFromFile("/Staking/get_pending_rewards").Args(o.Arguments().UInt64(0).Account("account")).RunReturnsJsonString() //  .RunMarshalAs(&farmMeta)
 	assert.Equal(t, pendingRewards, string("{}"))
 
 	// no Stakes
-	stakeInfo := o.ScriptFromFile("/Staking/read_stakes_info").Args(o.Arguments().UInt64(farmID)).RunReturnsJsonString() // .RunMarshalAs(&farmMeta)
+	stakeInfo := o.ScriptFromFile("/Staking/read_stakes_info").Args(o.Arguments().UInt64(0)).RunReturnsJsonString() // .RunMarshalAs(&farmMeta)
 	assert.Equal(t, stakeInfo, string("{}"))
 
 }
@@ -72,6 +70,7 @@ func testCreateNewFarm(o *overflow.Overflow, t *testing.T, farmID uint64) {
 		AssertEventCount(1)
 }
 
+// Test Create Reward Pool
 func TestCreateRewardPool(t *testing.T) {
 	o := overflow.NewTestingEmulator().Start()
 	setupFUSDVaultWithBalance(o, "account", 1000.0)
@@ -112,6 +111,7 @@ func testCreateRewardPool(o *overflow.Overflow, t *testing.T,
 
 }
 
+// Test update mocktimestamp
 func TestUpdateMockTimestamp(t *testing.T) {
 	o := overflow.NewTestingEmulator().Start()
 	setupFUSDVaultWithBalance(o, "account", 1000.0)

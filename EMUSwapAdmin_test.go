@@ -163,12 +163,17 @@ func TestCreateNewPool(t *testing.T) {
 	flowStoragePath := "flowTokenVault"
 	fusdStoragePath := "fusdVault"
 
-	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
+	testCreateSwapPool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
 }
 
-func testCreatePool(o *overflow.Overflow, t *testing.T, token1identifier string, token1Amount float64, token2identifier string, token2Amount float64) uint64 {
-	ids := getPoolIDs(o)
-	TOKEN_ID := fmt.Sprintf("%d", len(ids))
+func testCreateSwapPool(o *overflow.Overflow, t *testing.T, token1identifier string, token1Amount float64, token2identifier string, token2Amount float64) uint64 {
+
+	id := getNextPoolID(o)
+	TOKEN_ID := fmt.Sprintf("%d", id)
+
+	TOKEN_A := storagePathToTokenIdentifier(token1identifier) // "A.0ae53cb6e3f42a79.FlowToken"
+	TOKEN_B := storagePathToTokenIdentifier(token2identifier) // "A.f8d6e0586b0a20c7.FUSD"
+
 	o.TransactionFromFile("/EmuSwap/admin/create_new_pool").SignProposeAndPayAs("account").
 		Args(o.
 			Arguments().
@@ -187,11 +192,11 @@ func testCreatePool(o *overflow.Overflow, t *testing.T, token1identifier string,
 		})).
 		AssertEmitEvent(overflow.NewTestEvent("A.f8d6e0586b0a20c7.EmuSwap.NewSwapPoolCreated", map[string]interface{}{
 			"poolID": TOKEN_ID,
-			"tokenA": "A.0ae53cb6e3f42a79.FlowToken",
-			"tokenB": "A.f8d6e0586b0a20c7.FUSD",
+			"tokenA": TOKEN_A,
+			"tokenB": TOKEN_B,
 		}))
 
-	return uint64(len(ids))
+	return uint64(id)
 }
 
 /*
@@ -213,7 +218,7 @@ func TestTogglePoolFreeze(t *testing.T) {
 	flowStoragePath := "flowTokenVault"
 	fusdStoragePath := "fusdVault"
 
-	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
+	testCreateSwapPool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
 	poolID := uint64(0)
 	// getPoolMeta(o, poolID)
 
@@ -239,7 +244,7 @@ func TestTogglePoolFreeze(t *testing.T) {
 	flowStoragePath := "flowTokenVault"
 	fusdStoragePath := "fusdVault"
 
-	testCreatePool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
+	testCreateSwapPool(o, t, flowStoragePath, flowAmount, fusdStoragePath, fusdAmount)
 	testTogglePoolFreeze(o, t, 0)
 }
 
@@ -254,6 +259,41 @@ func testTogglePoolFreeze(o *overflow.Overflow, t *testing.T, poolID uint64) {
 			"id":       strconv.FormatUint(poolID, 10),
 			"isFrozen": "true",
 		}))
+}
+
+func TestWithdrawFees(t *testing.T) {
+	o := overflow.NewTestingEmulator().Start()
+	testSetupEmuToken(o, t, "user1")
+
+	mintFlowTokens(o, "account", 1000.0)
+	mintFlowTokens(o, "user1", 1000.0)
+
+	// Setup FUSD Vaults
+	setupFUSDVaultWithBalance(o, "account", 1000.0)
+	setupFUSDVaultWithBalance(o, "user1", 1000.0)
+
+	token1StorageID := "flowTokenVault"
+	token2StorageID := "fusdVault"
+	token1Amount := 100.0
+	token2Amount := 150.0
+
+	testCreateSwapPool(o, t, token1StorageID, token1Amount, token2StorageID, token2Amount)
+	testCreateSwapPool(o, t, token1StorageID, token1Amount, "emuTokenVault", token2Amount)
+	amount := 0.1
+
+	signer := "user1"
+
+	testSwap(o, t, signer, token1StorageID, token2StorageID, amount)
+	testSwap(o, t, signer, token1StorageID, "emuTokenVault", amount)
+	testSwap(o, t, signer, "emuTokenVault", token1StorageID, amount)
+	testWithdrawFees(o, t)
+}
+
+func testWithdrawFees(o *overflow.Overflow, t *testing.T) {
+	o.TransactionFromFile("EmuSwap/admin/withdraw_fees").SignProposeAndPayAsService().
+		Test(t).
+		AssertSuccess().
+		AssertEmitEventName("A.f8d6e0586b0a20c7.xEmuToken.FeesReceived")
 }
 
 // func (otu *OverflowTestUtils) NewOverFlowTest(t *testing.T) *OverflowTestUtils {
