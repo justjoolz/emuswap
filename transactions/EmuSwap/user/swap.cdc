@@ -25,7 +25,7 @@ transaction(fromTokenStorageIdentifier: String, toTokenStorageIdentifier: String
 
   execute {    
     let token1Vault <- self.token1VaultRef.withdraw(amount: amount)
-    let token2Vault <- EmuSwap.borrowPool(id: self.poolID)?.swapToken1ForToken2!(from: <-token1Vault)
+    let token2Vault <- EmuSwap.borrowPool(id: self.poolID)?.swapTokens!(from: <-token1Vault)
     self.token2VaultRef.deposit(from: <- token2Vault)
   }
 }

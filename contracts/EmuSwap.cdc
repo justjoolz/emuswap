@@ -211,6 +211,14 @@ pub contract EmuSwap: FungibleTokens {
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Swap Functions
         //
+        pub fun swapTokens(from: @FungibleToken.Vault): @FungibleToken.Vault {
+            if from.getType().identifier == self.token1Vault?.getType!().identifier {
+                return <- self.swapToken1ForToken2(from: <- from)
+            } else {
+                return <- self.swapToken2ForToken1(from: <- from)
+            }
+        }
+
         // Swaps Token1 -> Token2
         //
         pub fun swapToken1ForToken2(from: @FungibleToken.Vault): @FungibleToken.Vault {
