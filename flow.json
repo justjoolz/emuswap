@@ -38,6 +38,7 @@
 		"MetadataViews": "./contracts/dependencies/MetadataViews.cdc",
 		"Test": "./contracts/Test.cdc",
 		"FungibleTokens": "./contracts/dependencies/FungibleTokens.cdc",
+		"FTAirdrop": "./contracts/FTAirdrop.cdc",
 		"EmuSwap": "./contracts/EmuSwap.cdc",
 		"xEmuToken": "./contracts/xEmuToken.cdc",
 		"EmuToken": "./contracts/EmuToken.cdc",
@@ -87,9 +88,10 @@
 				"MetadataViews",
 				"FUSD",
 				"FungibleTokens",
-				"EmuSwap",
+				"FTAirdrop",
 				"EmuToken",
 				"xEmuToken",
+				"EmuSwap",
 				"StakingRewards"
 			],
 			"emulator-admin-account": [],
@@ -99,17 +101,17 @@
 		},
 		"testnet": {
 			"testnet-admin-account": [
-				"EmuSwap",
 				"EmuToken",
 				"xEmuToken",
+				"EmuSwap",
 				"StakingRewards"
 			]
 		},
 		"mainnet": {
 			"mainnet-admin-account": [
-				"EmuSwap",
 				"EmuToken",
 				"xEmuToken",
+				"EmuSwap",
 				"StakingRewards"
 			]
 		}
