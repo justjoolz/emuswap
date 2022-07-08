@@ -49,6 +49,9 @@ pub contract xEmuToken: FungibleToken {
     // Event that is emitted when a new burner resource is created
     pub event BurnerCreated()
 
+    // Event that is emitted when Fees are received via the FeesReceiver Resource
+    pub event FeesReceived(amount: UFix64)
+
     // Vault
     //
     // Each user stores an instance of only the Vault in their storage
@@ -195,25 +198,30 @@ pub contract xEmuToken: FungibleToken {
         return <- self.emuPool.withdraw(amount: amount)
     }
 
-    // j00lz 2do
-    // Anyone can call this at any time to withdraw the Emu tokens fees from EmuSwap Contract
-    pub fun withdrawFees() {
-        // EmuSwap.withdrawFeesInEmu()
-    }
-
     //
     pub fun depositRewards(funds: @FungibleToken.Vault) {
         pre {
             funds.isInstance(Type<@EmuToken.Vault>()) : "Funds provided are not EmuTokens!"
         }
+        emit FeesReceived(amount: funds.balance)
         self.emuPool.deposit(from: <-funds)
     }
-    
+
+    pub resource FeeReceiver: FungibleToken.Receiver {
+        pub fun deposit(from: @FungibleToken.Vault) {
+            xEmuToken.depositRewards(funds: <- from)
+        }
+    }
   
     init() {
         self.emuPool <- EmuToken.createEmptyVault() 
 
         self.totalSupply = 0.0
+
+        // Create the fee receiver
+        // we don't save the storage and public paths to a variable as they're only needed in the EmuSwap contract
+        self.account.save(<- create FeeReceiver(), to: /storage/xEmuFeeReceiver)
+        self.account.link<&FeeReceiver{FungibleToken.Receiver}>(/public/xEmuTokenFeeReceiver, target: /storage/xEmuFeeReceiver)
 
         // Create the Vault with the total supply of tokens and save it in storage
         //

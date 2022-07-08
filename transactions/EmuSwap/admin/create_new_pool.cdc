@@ -28,7 +28,7 @@ transaction(token1Storage: String, token1Amount: UFix64, token2Storage: String, 
     self.vaultB = signer.borrow<&FungibleToken.Vault>(from: StoragePath(identifier: token2Storage)!)
         ?? panic("Could not borrow a reference to Vault B: ".concat(token2Storage))
 
-    // check if Collection is created if not then create
+    // check if users lp collection is setup if not then create and link
     if signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath) == nil {
       // Create a new Collection and put it in storage
       signer.save(<- EmuSwap.createEmptyCollection(), to: EmuSwap.LPTokensStoragePath)
@@ -40,6 +40,8 @@ transaction(token1Storage: String, token1Amount: UFix64, token2Storage: String, 
       )
       
     }
+
+    // borrow users lp collection
     self.lpCollectionRef = signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath)!
 
     self.adminRef = signer.borrow<&EmuSwap.Admin>(from: EmuSwap.AdminStoragePath)

@@ -669,6 +669,30 @@ pub contract EmuSwap: FungibleTokens {
         return feesCollectedByIdentifier
     }
 
+    // Public function anyone can call that internally swaps all collected fees to EmuToken
+    pub fun swapFeesToEmuToken() {
+        pre {
+            EmuSwap.feesByIdentifier != nil
+        }
+        var ids: {String: UFix64} = {}
+        for key in EmuSwap.feesByIdentifier.keys {
+            let poolID = self.getPoolIDFromIdentifiers(token1: key, token2: "A.f8d6e0586b0a20c7.EmuToken.Vault") 
+            if poolID == nil { break }
+            let balance = EmuSwap.feesByIdentifier[key]?.balance!
+            let tokens <- EmuSwap.feesByIdentifier[key]?.withdraw!(amount: balance)
+            let poolRef = self.borrowPool(id: poolID!)!
+            self.feesByIdentifier["A.f8d6e0586b0a20c7.EmuToken.Vault"]?.deposit!(from: <- poolRef.swapTokens(from: <- tokens))
+        }
+    }
+
+    // public function to swap fees to emu tokens and send the tokens to xEmu contract
+    pub fun sendEmuFeesToDAO() {
+        self.swapFeesToEmuToken()
+        let balance = self.feesByIdentifier["A.f8d6e0586b0a20c7.EmuToken.Vault"]?.balance!
+        let tokens <- self.feesByIdentifier["A.f8d6e0586b0a20c7.EmuToken.Vault"]?.withdraw(amount: balance)!
+        let receiver = self.account.getCapability<&{FungibleToken.Receiver}>(/public/xEmuTokenFeeReceiver).borrow()!
+        receiver.deposit(from: <- tokens)
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Private Functions
