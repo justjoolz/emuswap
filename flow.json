@@ -42,7 +42,7 @@
         "testnet": "0x9a0766d93b6608b7"
       }
     },
-    "Test": "./contracts/Test.cdc",
+    "Vesting": "./contracts/Vesting.cdc",
     "FungibleTokens": "./contracts/dependencies/FungibleTokens.cdc",
     "FTAirdrop": "./contracts/FTAirdrop.cdc",
     "EmuSwap": "./contracts/EmuSwap.cdc",
@@ -92,6 +92,7 @@
         "FungibleTokens",
         "FTAirdrop",
         "EmuToken",
+        "Vesting",
         "xEmuToken",
         "EmuSwap",
         "StakingRewards"
