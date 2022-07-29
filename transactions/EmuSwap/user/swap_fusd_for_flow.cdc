@@ -2,7 +2,7 @@ import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
 import FlowToken from "../../../contracts/dependencies/FlowToken.cdc"
 import FUSD from "../../../contracts/dependencies/FUSD.cdc"
-import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
+import EmuSwap from "../../../contracts/EmuSwap.cdc"
 
 // swap_flow_for_fusd
 
@@ -39,10 +39,10 @@ transaction(amountIn: UFix64) {
   }
 
   execute {    
-    let token1Vault <- self.flowTokenVaultRef.withdraw(amount: amountIn) as! @FlowToken.Vault
+    let token2Vault <- self.fusdVaultRef.withdraw(amount: amountIn) as! @FUSD.Vault
 
-    let token2Vault <- EmuSwap.borrowPool(id: 0)?.swapToken1ForToken2!(from: <-token1Vault)
+    let token1Vault <- EmuSwap.borrowPool(id: 0)?.swapToken2ForToken1!(from: <-token2Vault)
 
-    self.fusdVaultRef.deposit(from: <- token2Vault)
+    self.flowTokenVaultRef.deposit(from: <- token1Vault)
   }
 }

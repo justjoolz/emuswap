@@ -4,7 +4,7 @@
 
 import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
-import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
+import EmuSwap from "../../../contracts/EmuSwap.cdc"
 import EmuToken from "../../../contracts/EmuToken.cdc"
 import StakingRewards from "../../../contracts/StakingRewards.cdc"
 
@@ -13,7 +13,7 @@ import FlowToken from "../../../contracts/dependencies/FlowToken.cdc"
 import FUSD from "../../../contracts/dependencies/FUSD.cdc"
 
 
-transaction(amount: UFix64) {
+transaction(farmID: UInt64, amount: UFix64) {
   // LP Tokens Collection ref
   let lpTokensCollection: &EmuSwap.Collection
 
@@ -50,20 +50,19 @@ transaction(amount: UFix64) {
     self.lpTokensCollection = signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath)
       ?? panic("Could not borrow reference to signers LP Tokens collection")
 
-    self.liquidityTokenRef = self.lpTokensCollection.borrowVault(id: 0)
+    self.liquidityTokenRef = self.lpTokensCollection.borrowVault(id: farmID)
 
-    self.pool = EmuSwap.borrowPool(id: 0) 
+    self.pool = EmuSwap.borrowPool(id: farmID) 
       ?? panic("Could not borrow pool")
 
     // Withdraw liquidity provider tokens from Pool
     self.lpTokenVault <- self.liquidityTokenRef.withdraw(amount: amount) as! @EmuSwap.TokenVault
-
     self.signer = signer
   }
 
   execute {
     // get reference to farm
-    let farmRef = StakingRewards.borrowFarm(id: 0)!
+    let farmRef = StakingRewards.borrowFarm(id: farmID)!
     
     // get deposit capabilities for returning lp tokens and rewards 
     let lpTokensReceiverCap = self.signer.getCapability<&{FungibleTokens.CollectionPublic}>(EmuSwap.LPTokensPublicReceiverPath)
@@ -72,6 +71,7 @@ transaction(amount: UFix64) {
     // check if there is an existing stake controller
     if self.signer.borrow<&StakingRewards.StakeControllerCollection>(from: StakingRewards.CollectionStoragePath) == nil {
       self.signer.save(<-StakingRewards.createStakingControllerCollection() , to: StakingRewards.CollectionStoragePath)
+      self.signer.link<&StakingRewards.StakeControllerCollection>(StakingRewards.CollectionPublicPath, target: StakingRewards.CollectionStoragePath)
     }
 
     // get stake controller collection ref 

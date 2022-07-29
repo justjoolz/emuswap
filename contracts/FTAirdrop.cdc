@@ -5,7 +5,7 @@ import FungibleToken from "./dependencies/FungibleToken.cdc"
 // and the amount they can claim
 // caller sets time limit during which he cannot withdraw the tokens
 // after the time limit expires the claiming ends and the owner can withdraw any remaining tokens
-pub contract Airdrop {
+pub contract FTAirdrop {
 
     // drops by ID 
     access(contract) let drops: @{UInt64:Drop}
@@ -13,8 +13,13 @@ pub contract Airdrop {
     // unique id for each drop
     access(contract) var nextDropID: UInt64
 
+    // paths
+    pub let DropControllerStoragePath: StoragePath
+
+    // events
     pub event DropCreated(id: UInt64, address: Address, amount: UFix64)
     pub event DropClaimed(id: UInt64, address: Address, amount: UFix64)
+    pub event DropDestroyed(id: UInt64)
 
     // Create Drop Function
     //
@@ -48,16 +53,25 @@ pub contract Airdrop {
         return <- dropController
     }
 
+
+    pub fun getDrops(): [UInt64] {
+        return self.drops.keys
+    }
+
     // Check Available Claims
     //
     // Returns all drop IDs and required ftType for a given address  
     //
-    pub fun checkAvailableClaims(address: Address): {UInt64: Type} {
-        let claimableDropIDs: {UInt64: Type} = {} 
+    pub fun checkAvailableClaims(address: Address): AnyStruct {
+        let claimableDropIDs:  [AnyStruct] = []
         for key in self.drops.keys {
             let dropRef = (&self.drops[key] as &Drop?)!
             if dropRef.availableToClaimByAddress.containsKey(address) {
-                claimableDropIDs.insert(key: key, dropRef.ftReceiverCap.getType())
+                claimableDropIDs.append( {
+                    "id": key,
+                    "amount": dropRef.availableToClaimByAddress[address],
+                    "type": dropRef.vault.getType().identifier
+                })
             }
         }
         return claimableDropIDs
@@ -68,9 +82,9 @@ pub contract Airdrop {
     // Claims full amount available for the address of the ft receiver cap provided 
     //
     pub fun claimDrop(dropID: UInt64, ftReceiverCap: Capability<&{FungibleToken.Receiver}>) {
-        let dropRef = (&self.drops[dropID] as &Drop?)!
-        let amount = dropRef.availableToClaimByAddress[ftReceiverCap.address]!
-        dropRef.claim(amount: amount, ftReceiverCap: ftReceiverCap)
+        let dropRef = (&self.drops[dropID] as &Drop?) ?? panic("Drop ID Does not exist!")
+        assert(dropRef.availableToClaimByAddress[ftReceiverCap.address] != nil, message: "Address has no available tokens to claim!")
+        let amount = dropRef.claim(ftReceiverCap: ftReceiverCap)
         emit DropClaimed(id: dropID, address: ftReceiverCap.address, amount: amount)
     }
 
@@ -89,11 +103,13 @@ pub contract Airdrop {
             self.availableToClaimByAddress.insert(key: address, amount)
         }
 
-        pub fun claim(amount:UFix64, ftReceiverCap: Capability<&{FungibleToken.Receiver}>) {
+        pub fun claim(ftReceiverCap: Capability<&{FungibleToken.Receiver}>): UFix64 {
             let claimAddress = ftReceiverCap.address
             let receiverRef = ftReceiverCap.borrow()
+            let amount = self.availableToClaimByAddress[claimAddress] ?? panic("This address does not have any tokens to claim!")
             receiverRef?.deposit(from: <- self.vault.withdraw(amount: amount))
-            self.availableToClaimByAddress[ftReceiverCap.address] = self.availableToClaimByAddress[ftReceiverCap.address]! - amount
+            self.availableToClaimByAddress[ftReceiverCap.address] = nil // self.availableToClaimByAddress[ftReceiverCap.address]! - amount
+            return amount
         }
 
         pub fun totalClaims(): UFix64 {
@@ -134,10 +150,11 @@ pub contract Airdrop {
         // Total must be less than funds deposited
         //
         pub fun addClaims(addresses: {Address: UFix64}) {
-            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
+            let dropRef = (&FTAirdrop.drops[self.id] as &Drop?)!
             assert(getCurrentBlock().timestamp <= dropRef.startTime, message: "Cannot add addresses once claim has begun")
             var totalClaims = dropRef.totalClaims()
             for key in addresses.keys {
+                dropRef.addClaim(address: key, amount: addresses[key]!)
                 totalClaims = totalClaims + dropRef.availableToClaimByAddress[key]!
                 assert(totalClaims <= dropRef.vault.balance, message: "More claims than balance available!")
                 dropRef.addClaim(address: key, amount: addresses[key]!)
@@ -150,7 +167,7 @@ pub contract Airdrop {
         // owner can withdraw any unclaimed funds to their  ft receiver provided on creation
         //
         pub fun withdrawFunds() {
-            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
+            let dropRef = (&FTAirdrop.drops[self.id] as &Drop?)!
             assert(getCurrentBlock().timestamp < dropRef.endTime, message: "Drop has not ended yet!")
             let funds <- dropRef.vault.withdraw(amount: dropRef.vault.balance)
             dropRef.ftReceiverCap.borrow()?.deposit!(from: <- funds)
@@ -161,7 +178,7 @@ pub contract Airdrop {
         // owner can deposit additional funds before the drop starts
         //
         pub fun depositFunds(funds: @FungibleToken.Vault) {
-            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
+            let dropRef = (&FTAirdrop.drops[self.id] as &Drop?)!
             assert(getCurrentBlock().timestamp < dropRef.startTime, message: "Drop has already started!")
             dropRef.vault.deposit(from: <- funds)
         }
@@ -173,17 +190,44 @@ pub contract Airdrop {
 
         // owner can destroy their controller returning all funds to the provided ft receiver
         destroy () {
-            let dropRef = (&Airdrop.drops[self.id] as &Drop?)!
-            assert(getCurrentBlock().timestamp > dropRef.endTime, message: "Cannot destroy before endtime is reached")
+            let dropRef = (&FTAirdrop.drops[self.id] as &Drop?)!
+            assert(getCurrentBlock().timestamp >= dropRef.endTime, message: "Cannot destroy before endtime is reached")
             if dropRef.vault.balance > 0.0 {
                 self.withdrawFunds()
             }
             assert(dropRef.vault.balance == 0.0, message: "Funds remaining in referenced drop, cannot destroy controller")
-            Airdrop.drops[self.id] <-! nil
+            FTAirdrop.drops[self.id] <-! nil
+
+            emit DropDestroyed(id: self.id)
         }
     }
 
+    pub resource DropControllerCollection {
+        access(contract) var drops: @{UInt64: DropController}
+
+        pub fun deposit(drop: @DropController) {
+            self.drops[drop.uuid] <-! drop
+        }
+
+        pub fun clean(id: UInt64) {
+            destroy self.drops.remove(key: id)
+        }
+
+        init() {
+            self.drops <- {}
+        }
+
+        destroy () {
+            destroy self.drops
+        }
+    }
+
+    pub fun createEmptyDropCollection(): @DropControllerCollection {
+        return <- create DropControllerCollection() 
+    }
+
     init() {
+        self.DropControllerStoragePath = /storage/FTAirDropController
         self.drops <- {}
         self.nextDropID = 0
     }

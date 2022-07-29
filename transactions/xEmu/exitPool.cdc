@@ -7,22 +7,22 @@ import EmuToken from "../../contracts/EmuToken.cdc"
 transaction(amount: UFix64) {
 
   // The Vault resource that holds the tokens being transferred
-  let emuVault: @FungibleToken.Vault
+  let xEmuVault: @FungibleToken.Vault
   let emuVaultRef: &FungibleToken.Vault
 
   prepare(signer: AuthAccount) {
-    // Get a reference to the signer's stored EmuToken vault
-    let vaultRef = signer
+    // Get a reference to the signer's stored XEmuToken vault
+    let XEmuVaultRef = signer
       .borrow<&xEmuToken.Vault>(from: xEmuToken.EmuTokenStoragePath)
       ?? panic("Could not borrow reference to the owner's Vault!")
-        
-    self.emuVaultRef = signer.borrow<&xEmuToken.Vault>(from: xEmuToken.EmuTokenStoragePath)!
-    
     // Withdraw tokens from the signer's stored vault
-    self.emuVault <- vaultRef.withdraw(amount: amount)
+    self.xEmuVault <- XEmuVaultRef.withdraw(amount: amount)
+
+    // borrow users EmuToken Vault to deposit into
+    self.emuVaultRef = signer.borrow<&EmuToken.Vault>(from: EmuToken.EmuTokenStoragePath)!
   }
 
   execute {
-    self.emuVaultRef.deposit(from: <- xEmuToken.leavePool(xEmuTokens: <-self.emuVault) )
+    self.emuVaultRef.deposit(from: <- xEmuToken.leavePool(xEmuTokens: <-self.xEmuVault) )
   }
 }

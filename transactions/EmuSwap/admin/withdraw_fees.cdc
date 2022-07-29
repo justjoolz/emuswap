@@ -1,10 +1,9 @@
-// update_fee_percentage
-//
-// Updates the Fee for LP Providers
+// freeze_pool
 
 import EmuSwap from "../../../contracts/EmuSwap.cdc"
+import xEmuToken from "../../../contracts/xEmuToken.cdc"
 
-transaction(id: UInt64, feePercentage: UFix64) {
+transaction() {
 
   let adminRef: &EmuSwap.Admin
 
@@ -12,10 +11,9 @@ transaction(id: UInt64, feePercentage: UFix64) {
 
     self.adminRef = signer.borrow<&EmuSwap.Admin>(from: EmuSwap.AdminStoragePath)
       ?? panic("Could not borrow a reference to EmuSwap Admin")
-    
   }
 
   execute {
-      self.adminRef.updateDAOFeePercentage(id: id, feePercentage: feePercentage)
+    EmuSwap.sendEmuFeesToDAO()
   }
 }

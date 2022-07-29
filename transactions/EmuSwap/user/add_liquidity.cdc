@@ -1,16 +1,14 @@
 import FungibleToken from "../../../contracts/dependencies/FungibleToken.cdc"
 import FungibleTokens from "../../../contracts/dependencies/FungibleTokens.cdc"
-import EmuToken from "../../../contracts/EmuToken.cdc"
-import FUSD from "../../../contracts/dependencies/FUSD.cdc"
-import EmuSwap from "../../../contracts/exchange/EmuSwap.cdc"
+import EmuSwap from "../../../contracts/EmuSwap.cdc"
 
-transaction(token1Amount: UFix64, token2Amount: UFix64) {
+transaction(token1Path: String, token1Amount: UFix64, token2Path: String, token2Amount: UFix64) {
   
   let poolID:UInt64
 
   // The Vault references that holds the tokens that are being added as liquidity
-  let emuTokenVaultRef: &EmuToken.Vault
-  let fusdVaultRef: &FUSD.Vault
+  let token1VaultRef: &FungibleToken.Vault
+  let token2VaultRef: &FungibleToken.Vault
 
   // reference to lp collection
   var lpCollectionRef: &EmuSwap.Collection
@@ -19,14 +17,17 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
   var liquidityTokenRef: &FungibleTokens.TokenVault
 
   prepare(signer: AuthAccount) {
-    // perhaps function to look this up instead of hard coding
-    self.poolID = 1
 
-    self.emuTokenVaultRef = signer.borrow<&EmuToken.Vault>(from: EmuToken.EmuTokenStoragePath)
-        ?? panic("Could not borrow a reference to Vault")
+    self.token1VaultRef = signer.borrow<&FungibleToken.Vault>(from: StoragePath(identifier: token1Path)!)
+        ?? panic("Could not borrow a reference to Vault ".concat(token1Path))
 
-    self.fusdVaultRef = signer.borrow<&FUSD.Vault>(from: /storage/fusdVault)
-        ?? panic("Could not borrow a reference to Vault")
+    self.token2VaultRef = signer.borrow<&FungibleToken.Vault>(from: StoragePath(identifier: token2Path)!)
+        ?? panic("Could not borrow a reference to Vault ".concat(token2Path))
+    
+    let token1Identifier = self.token1VaultRef.getType().identifier
+    let token2Identifier = self.token2VaultRef.getType().identifier
+    
+    self.poolID = EmuSwap.getPoolIDFromIdentifiers(token1: token1Identifier, token2: token2Identifier) ?? panic("Can't find swap pool for ".concat(token1Identifier).concat(" and ".concat(token2Identifier)))
 
      // check if Collection is created if not then create
     if signer.borrow<&EmuSwap.Collection>(from: EmuSwap.LPTokensStoragePath) == nil {
@@ -54,8 +55,8 @@ transaction(token1Amount: UFix64, token2Amount: UFix64) {
 
   execute {
     // Withdraw tokens
-    let token1Vault <- self.emuTokenVaultRef.withdraw(amount: token1Amount) as! @EmuToken.Vault
-    let token2Vault <- self.fusdVaultRef.withdraw(amount: token2Amount) as! @FUSD.Vault
+    let token1Vault <- self.token1VaultRef.withdraw(amount: token1Amount)
+    let token2Vault <- self.token2VaultRef.withdraw(amount: token2Amount)
 
     // create a token bundle with both tokens in equal measure
     let tokenBundle <- EmuSwap.createTokenBundle(fromToken1: <- token1Vault, fromToken2: <- token2Vault)

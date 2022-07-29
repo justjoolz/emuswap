@@ -2,7 +2,7 @@ import NonFungibleToken from "./dependencies/NonFungibleToken.cdc"
 import FungibleToken from "./dependencies/FungibleToken.cdc"
 import FungibleTokens from "./dependencies/FungibleTokens.cdc"
 import EmuToken from "./EmuToken.cdc"
-import EmuSwap from "./exchange/EmuSwap.cdc"
+import EmuSwap from "./EmuSwap.cdc"
 
 // Liquidity Mining
 //
@@ -38,11 +38,14 @@ pub contract StakingRewards {
     // Paths
     pub let AdminStoragePath: StoragePath
     pub let CollectionStoragePath: StoragePath
+    pub let CollectionPublicPath: PublicPath
 
     // Events
     pub event NewFarmCreated(farmID: UInt64)
     pub event EmissionRateUpdated(newRate: UFix64)
-    pub event TokensStaked(address: Address, amountStaked: UFix64, totalStaked: UFix64)
+    pub event RewardPoolCreated(id: UInt64)
+    pub event StakingControllerDeposited(to: Address, farmID: UInt64)
+    pub event TokensStaked(address: Address, poolID: UInt64, amountStaked: UFix64, totalStaked: UFix64)
     pub event TokensUnstaked(address: Address, amountUnstaked: UFix64, totalStaked: UFix64)
     pub event RewardsClaimed(address: Address, tokenType: String, amountClaimed: UFix64, rewardDebt: Fix64, totalRemaining: UFix64)
 
@@ -269,7 +272,7 @@ pub contract StakingRewards {
                 // update Farm total staked
                 self.totalStaked = self.totalStaked + amountStaked
 
-                emit TokensStaked(address: lpTokensReceiverCap.address, amountStaked: amountStaked, totalStaked: self.totalStaked)
+                emit TokensStaked(address: lpTokensReceiverCap.address, poolID: id, amountStaked: amountStaked, totalStaked: self.totalStaked)
 
                 // return stake controller for user to access their tokens
                 return <- create StakeController(id: id) // id needs to be unique per user and per Farm
@@ -300,7 +303,7 @@ pub contract StakingRewards {
                     }
                 }
 
-                emit TokensStaked(address: lpTokensReceiverCap.address, amountStaked: amountStaked, totalStaked: self.totalStaked)
+                emit TokensStaked(address: lpTokensReceiverCap.address, poolID: id, amountStaked: amountStaked, totalStaked: self.totalStaked)
                 return nil // no need to give them a new StakeController
             }           
         }
@@ -422,7 +425,9 @@ pub contract StakingRewards {
         access(contract) var rewardsReceiverCaps: {UInt64: Capability<&{FungibleToken.Receiver}>}
 
         init(lpTokens: @FungibleTokens.TokenVault, rewardDebt: {UInt64: Fix64}, lpTokenReceiverCap: Capability<&{FungibleTokens.CollectionPublic}>, rewardsReceiverCaps: [Capability<&{FungibleToken.Receiver}>], nfts: @[NonFungibleToken.NFT], nftReceiverCaps: [Capability<&{NonFungibleToken.CollectionPublic}>]) {
-            self.lpTokenVault <- lpTokens
+            self.lpTokenVault <- EmuSwap.createEmptyTokenVault(tokenID: lpTokens.tokenID)
+            self.lpTokenVault.deposit(from: <- lpTokens) // now we have deposit event but with no owner address
+
             self.lpTokenReceiverCap = lpTokenReceiverCap
 
             self.rewardsReceiverCaps = {}
@@ -534,25 +539,38 @@ pub contract StakingRewards {
 
     }
 
+    pub resource interface StakeControllerCollectionPublic {
+        pub fun getIDs(): [UInt64]
+        pub fun getStakeMeta(id: UInt64): StakeInfo
+    }
+
     // Stake Controller Collection
     //
     //
-    pub resource StakeControllerCollection { 
+    pub resource StakeControllerCollection: StakeControllerCollectionPublic { 
         pub var ownedStakeControllers: @{UInt64:StakeController}
 
         pub fun deposit(stakeController: @StakeController) {
             pre {
                 self.ownedStakeControllers[stakeController.farmID] == nil : "Cannot have multiple controllers for same farm!"
             }
-            self.ownedStakeControllers[stakeController.farmID] <-! stakeController
-        }
-
-        pub fun withdraw(id: UInt64): @StakeController? {
-            return <- self.ownedStakeControllers.remove(key: id)
+            let farmID = stakeController.farmID
+            self.ownedStakeControllers[farmID] <-! stakeController
+            emit StakingControllerDeposited(to: self.owner?.address!, farmID: farmID)
         }
 
         pub fun borrow(id: UInt64): &StakeController? {
             return &self.ownedStakeControllers[id] as &StakeController?
+        }
+
+        pub fun getIDs(): [UInt64] {
+            return self.ownedStakeControllers.keys
+        }
+
+        pub fun getStakeMeta(id: UInt64): StakeInfo {
+            let farmRef = &StakingRewards.farmsByID[id] as &Farm?
+            let controllerRef = &self.ownedStakeControllers[id] as &StakeController?
+            return StakeInfo( controllerRef!.borrowStake(), farm: farmRef!)
         }
 
         init() {
@@ -589,7 +607,7 @@ pub contract StakingRewards {
                 let farmRef = (&StakingRewards.farmsByID[id] as &Farm?)!
                 farmRef.initPool(poolID: poolID)
             }
-            // emit RewardPoolCreated() // j00lz 2do
+            emit RewardPoolCreated(id: poolID)
         }
 
         // fun deposit reward tokens
@@ -653,6 +671,7 @@ pub contract StakingRewards {
         pub let farmWeightsByID: {UInt64: UFix64}
         pub let rewardTokensPerSecondByID: {UInt64: UFix64}
         pub let totalAccumulatedTokensPerShareByID: {UInt64: UFix64}
+        pub let rewardsRemainingByID: {UInt64: UFix64}
 
         init(_ farmRef: &Farm) {
             self.id = farmRef.emuSwapPoolID
@@ -662,12 +681,14 @@ pub contract StakingRewards {
             self.farmWeightsByID = {}
             self.rewardTokensPerSecondByID = {}
             self.totalAccumulatedTokensPerShareByID = {}
+            self.rewardsRemainingByID = {}
 
             for poolID in StakingRewards.rewardPoolsByID.keys {
                 let rewardPoolRef = (&StakingRewards.rewardPoolsByID[poolID] as &RewardPool?)!
                 self.farmWeightsByID[poolID] = rewardPoolRef.farmWeightsByID[self.id]!
                 self.rewardTokensPerSecondByID[poolID] = rewardPoolRef.emissionDetails.getCurrentEmissionRate(genesisTS: rewardPoolRef.rewardsGenesisTimestamp)
                 self.totalAccumulatedTokensPerShareByID[poolID] = farmRef.totalAccumulatedTokensPerShareByRewardPoolID[poolID]
+                self.rewardsRemainingByID[poolID] = rewardPoolRef.vault.balance
             }
         }        
     }
@@ -781,6 +802,7 @@ pub contract StakingRewards {
         
         self.AdminStoragePath = /storage/EmuStakingRewardsAdmin
         self.CollectionStoragePath = /storage/EmuStakingRewardsCollection
+        self.CollectionPublicPath = /public/EmuStakingRewardsCollection
 
         destroy self.account.load<@AnyResource>(from: self.AdminStoragePath)
         self.account.save(<-create Admin(), to: self.AdminStoragePath)

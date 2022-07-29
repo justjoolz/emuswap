@@ -7,11 +7,12 @@
 ╚══════╝░╚═╝░░░░░╚═╝░░╚═════╝░░░╚═════╝░░░░╚═╝░░░╚═╝░░╚═╝░░╚═╝╚═╝░░░░░
 */
 
-import FungibleToken from "../dependencies/FungibleToken.cdc"
-import FungibleTokens from "../dependencies/FungibleTokens.cdc"
-import MetadataViews from "../dependencies/MetadataViews.cdc"
+import FungibleToken from "./dependencies/FungibleToken.cdc"
+import FungibleTokens from "./dependencies/FungibleTokens.cdc"
+import MetadataViews from "./dependencies/MetadataViews.cdc"
 
 pub contract EmuSwap: FungibleTokens {
+    access(contract) var PRECISION: UFix64
   
     // Pools kept here and only accessible via the contract (could make account to allow for future ideas?)
     access(contract) var poolsByID: @{UInt64: Pool}
@@ -26,7 +27,7 @@ pub contract EmuSwap: FungibleTokens {
     access(contract) var feesByIdentifier: @{String: FungibleToken.Vault}
 
     //  unique ID for each pool
-    pub var nextPoolID: UInt64
+    access(contract) var nextPoolID: UInt64
     access(contract) var LPFeePercentage: UFix64
     access(contract) var DAOFeePercentage: UFix64
 
@@ -51,6 +52,7 @@ pub contract EmuSwap: FungibleTokens {
     // Event emitted when a new LP token is initalized
     pub event TokensInitialized(tokenID: UInt64)
 
+
     // Event that is emitted when tokens are withdrawn from a Vault
     pub event TokensWithdrawn(tokenID: UInt64, amount: UFix64, from: Address?)
 
@@ -74,7 +76,9 @@ pub contract EmuSwap: FungibleTokens {
     pub event Swap(token1Amount: UFix64, token2Amount: UFix64, poolID: UInt64, direction: UInt8)
     
     // j00lz add Pool creation details (how is this different from new LP token creation?)
-    pub event NewSwapPoolCreated()
+    pub event NewSwapPoolCreated(poolID: UInt64, tokenA: String, tokenB: String)
+
+    pub event PoolIsFrozen(id: UInt64, isFrozen: Bool)
     
     pub event FeesDeposited(tokenIdentifier: String, amount: UFix64)
 
@@ -92,12 +96,14 @@ pub contract EmuSwap: FungibleTokens {
 
         pub let token1Identifier: String
         pub let token2Identifier: String
+        pub let totalSupply: UFix64
 
         init(poolRef: &Pool) {
+            self.totalSupply = EmuSwap.totalSupplyByID[poolRef.ID]!
             self.token1Amount = poolRef.token1Vault?.balance!
             self.token2Amount = poolRef.token2Vault?.balance!
-            self.token1Identifier = poolRef.token1Vault.getType().identifier
-            self.token2Identifier = poolRef.token2Vault.getType().identifier
+            self.token1Identifier = poolRef.token1Vault?.getType()!.identifier
+            self.token2Identifier = poolRef.token2Vault?.getType()!.identifier
             // poolRef.DAOFeePercentage
             // poolRef.LPFeePercentage
         }
@@ -136,9 +142,7 @@ pub contract EmuSwap: FungibleTokens {
             self.DAOFeePercentage = DAOFeePercentage
             self.LPFeePercentage = LPFeePercentage
             
-            // Emit an event that shows that the contract was initialized
             emit TokensInitialized(tokenID: self.ID)
-            ///emit TokensInitialized(tokenID: self.ID, tokenName: tokenName, tokenSymbol: tokenSymbol, initialSupply: EmuSwap.totalSupplyByID[self.ID]!)
         }
 
         destroy() {
@@ -207,6 +211,14 @@ pub contract EmuSwap: FungibleTokens {
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Swap Functions
         //
+        pub fun swapTokens(from: @FungibleToken.Vault): @FungibleToken.Vault {
+            if from.getType().identifier == self.token1Vault?.getType!().identifier {
+                return <- self.swapToken1ForToken2(from: <- from)
+            } else {
+                return <- self.swapToken2ForToken1(from: <- from)
+            }
+        }
+
         // Swaps Token1 -> Token2
         //
         pub fun swapToken1ForToken2(from: @FungibleToken.Vault): @FungibleToken.Vault {
@@ -303,8 +315,8 @@ pub contract EmuSwap: FungibleTokens {
             assert(token2Vault.balance > 0.0, message: "Empty token2 vault")
 
             // shift decimal 4 places to avoid truncation error
-            let token1Percentage: UFix64 = (token1Vault.balance * 10000.0) / self.token1Vault?.balance!
-            let token2Percentage: UFix64 = (token2Vault.balance * 10000.0) / self.token2Vault?.balance!
+            let token1Percentage: UFix64 = (token1Vault.balance * EmuSwap.PRECISION) / self.token1Vault?.balance!
+            let token2Percentage: UFix64 = (token2Vault.balance * EmuSwap.PRECISION) / self.token2Vault?.balance!
 
             // final liquidity token minted is the smaller between token1Liquidity and token2Liquidity
             // to maximize profit, user should add liquidity propotional to current liquidity
@@ -316,7 +328,7 @@ pub contract EmuSwap: FungibleTokens {
             self.token1Vault?.deposit!(from: <- token1Vault)
             self.token2Vault?.deposit!(from: <- token2Vault)
 
-            return <- EmuSwap.mintTokens(tokenID: self.ID, amount: (EmuSwap.totalSupplyByID[0]! * liquidityPercentage) / 10000.0)
+            return <- EmuSwap.mintTokens(tokenID: self.ID, amount: (EmuSwap.totalSupplyByID[self.ID]! * liquidityPercentage) / EmuSwap.PRECISION)
         }
 
         // Remove Liquidity
@@ -329,15 +341,14 @@ pub contract EmuSwap: FungibleTokens {
                 from.balance < EmuSwap.totalSupplyByID[self.ID]!: "Cannot remove all liquidity"
             }
 
-            // shift decimal 4 places to avoid truncation error
-            let liquidityPercentage = (from.balance * 10000.0) / EmuSwap.totalSupplyByID[0]!
+            let liquidityPercentage = (from.balance * EmuSwap.PRECISION) / EmuSwap.totalSupplyByID[self.ID]!
 
             assert(liquidityPercentage > 0.0, message: "Insufficient Liquidity")
 
             // Burn liquidity tokens and withdraw tokens to bundle
             EmuSwap.burnTokens(from: <- from)
-            let token1Vault <- self.token1Vault?.withdraw(amount: (self.token1Vault?.balance! * liquidityPercentage) / 10000.0)!
-            let token2Vault <- self.token2Vault?.withdraw(amount: (self.token2Vault?.balance! * liquidityPercentage) / 10000.0)!
+            let token1Vault <- self.token1Vault?.withdraw(amount: (self.token1Vault?.balance! * liquidityPercentage) / EmuSwap.PRECISION)!
+            let token2Vault <- self.token2Vault?.withdraw(amount: (self.token2Vault?.balance! * liquidityPercentage) / EmuSwap.PRECISION)!
 
             return <- EmuSwap.createTokenBundle(fromToken1: <- token1Vault, fromToken2: <- token2Vault)
         }
@@ -346,6 +357,7 @@ pub contract EmuSwap: FungibleTokens {
         //
         access(contract) fun togglePoolFreeze() {
             self.isFrozen = !self.isFrozen
+            emit PoolIsFrozen(id: self.ID, isFrozen: self.isFrozen)
         }
 
         access(contract) fun setDAOFeePercentage(_ feePercentage: UFix64) {
@@ -466,13 +478,15 @@ pub contract EmuSwap: FungibleTokens {
             return <- self.token2.withdraw(amount: self.token2.balance)
         }
 
-        // returns identifiers with ".Vault" from "A.f8d6e0586b0a20c7.FUSD.Vault"
+        // returns identifiers without ".Vault" from "A.f8d6e0586b0a20c7.FUSD.Vault"
         pub fun getIdentifiers(): [String] {
             let ids = [self.token1.getType().identifier, self.token2.getType().identifier]
-            ids[0] = ids[0].slice(from: 0, upTo: ids[0].length - 6)
-            ids[1] = ids[1].slice(from: 0, upTo: ids[1].length - 6)
+            ids[0] = EmuSwap.sliceVaultFromString(ids[0])
+            ids[1] = EmuSwap.sliceVaultFromString(ids[1])
             return ids
         }
+
+       
 
         destroy() {
             destroy self.token1
@@ -537,7 +551,8 @@ pub contract EmuSwap: FungibleTokens {
 
             assert(token1 != token2, message: "Cannot create pool with identical tokens!")
             assert(EmuSwap.getPoolIDFromIdentifiers(token1: token1, token2: token2) == nil, message: "Pool already exists")
-            
+            assert(from.token1.balance != 0.0 && from.token2.balance != 0.0)
+
             // create new pool
             let newPool <- create Pool(DAOFeePercentage: EmuSwap.DAOFeePercentage, LPFeePercentage: EmuSwap.LPFeePercentage)
             
@@ -563,8 +578,7 @@ pub contract EmuSwap: FungibleTokens {
             // increment ready for next new pool
             EmuSwap.nextPoolID = EmuSwap.nextPoolID + 1
             
-            // j00lz 2do add details to event
-            emit NewSwapPoolCreated()
+            emit NewSwapPoolCreated(poolID: lpTokens.tokenID, tokenA: token1, tokenB: token2)
 
             return <- lpTokens
         }
@@ -621,17 +635,22 @@ pub contract EmuSwap: FungibleTokens {
     }
 
     pub fun getPoolIDFromIdentifiers(token1: String, token2: String): UInt64? {
-        let token1ToToken2Exists = EmuSwap.poolsMap.containsKey(token1) && EmuSwap.poolsMap[token1]!.containsKey(token2) 
-        let token2ToToken1Exists = EmuSwap.poolsMap.containsKey(token2) && EmuSwap.poolsMap[token2]!.containsKey(token1) 
+        let token1short = EmuSwap.sliceVaultFromString(token1)
+        let token2short = EmuSwap.sliceVaultFromString(token2)
+        let token2ToToken1Exists = EmuSwap.poolsMap.containsKey(token2short) && EmuSwap.poolsMap[token2short]!.containsKey(token1short) 
+        let token1ToToken2Exists = EmuSwap.poolsMap.containsKey(token1short) && EmuSwap.poolsMap[token1short]!.containsKey(token2short) 
 
         if token1ToToken2Exists && token2ToToken1Exists {
-            return self.poolsMap[token1]![token2]!
+            return self.poolsMap[token1short]![token2short]!
         } else {
             return nil
         }
     }
 
-    // j00lz todo add these to metadata format... 
+    pub fun getNextPoolID(): UInt64 {
+        return self.nextPoolID
+    }
+
     pub fun getLPFeePercentage(): UFix64 {
         return self.LPFeePercentage
     }
@@ -651,6 +670,30 @@ pub contract EmuSwap: FungibleTokens {
         return feesCollectedByIdentifier
     }
 
+    // Public function anyone can call that internally swaps all collected fees to EmuToken
+    pub fun swapFeesToEmuToken() {
+        pre {
+            EmuSwap.feesByIdentifier != nil
+        }
+        var ids: {String: UFix64} = {}
+        for key in EmuSwap.feesByIdentifier.keys {
+            let poolID = self.getPoolIDFromIdentifiers(token1: key, token2: "A.f8d6e0586b0a20c7.EmuToken.Vault") 
+            if poolID == nil { break }
+            let balance = EmuSwap.feesByIdentifier[key]?.balance!
+            let tokens <- EmuSwap.feesByIdentifier[key]?.withdraw!(amount: balance)
+            let poolRef = self.borrowPool(id: poolID!)!
+            self.feesByIdentifier["A.f8d6e0586b0a20c7.EmuToken.Vault"]?.deposit!(from: <- poolRef.swapTokens(from: <- tokens))
+        }
+    }
+
+    // public function to swap fees to emu tokens and send the tokens to xEmu contract
+    pub fun sendEmuFeesToDAO() {
+        self.swapFeesToEmuToken()
+        let balance = self.feesByIdentifier["A.f8d6e0586b0a20c7.EmuToken.Vault"]?.balance!
+        let tokens <- self.feesByIdentifier["A.f8d6e0586b0a20c7.EmuToken.Vault"]?.withdraw(amount: balance)!
+        let receiver = self.account.getCapability<&{FungibleToken.Receiver}>(/public/xEmuTokenFeeReceiver).borrow()!
+        receiver.deposit(from: <- tokens)
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Private Functions
@@ -747,12 +790,20 @@ pub contract EmuSwap: FungibleTokens {
 
         return at
     }
+
+    // slice if present if not present don't!
+    pub fun sliceVaultFromString(_ identifier: String): String {
+        if identifier.slice(from:identifier.length-6, upTo: identifier.length) == ".Vault" { 
+        return identifier.slice(from: 0, upTo: identifier.length - 6) }
+        return identifier
+    }
     
     // Contract Initalization
     // 
     // Sets up fees, paths and stores Admin resource to storage
     //  
     init() {
+        self.PRECISION = 10000.0
         self.totalSupplyByID = {}
         self.poolsByID <- {}
         self.poolsMap = {}

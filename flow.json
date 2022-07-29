@@ -1,117 +1,123 @@
 {
-	"emulators": {
-		"default": {
-			"port": 3569,
-			"serviceAccount": "emulator-account"
-		}
-	},
-	"contracts": { 
-		"FungibleToken": {
-			"source": "./contracts/dependencies/FungibleToken.cdc",
-			"aliases": {
-				"emulator": "0xee82856bf20e2aa6",
-				"testnet": "0x9a0766d93b6608b7",
-				"mainnet": "0xf233dcee88fe0abe"
-			}
-		},
-		"NonFungibleToken": {
-			"source": "./contracts/dependencies/NonFungibleToken.cdc",
-			"aliases": {
-				"testnet": "0x631e88ae7f1d7c20",
-				"mainnet": "0x1d7e57aa55817448"
-			}
-		},
-		"FlowToken": {
-			"source": "./contracts/dependencies/FlowToken.cdc",
-			"aliases": {
-				"emulator": "0x0ae53cb6e3f42a79",
-				"testnet": "0x7e60df042a9c0868",
-				"mainnet": "0x1654653399040a61"
-			}
-		},
-		"FUSD": {
-			"source": "./contracts/dependencies/FUSD.cdc",
-			"aliases": {
-				"testnet": "0x9a0766d93b6608b7"
-			}
-		},
-		"MetadataViews": "./contracts/dependencies/MetadataViews.cdc",
-		"Test": "./contracts/Test.cdc",
-		"FungibleTokens": "./contracts/dependencies/FungibleTokens.cdc",
-		"EmuSwap": "./contracts/exchange/EmuSwap.cdc",
-		"xEmuToken": "./contracts/xEmuToken.cdc",
-		"EmuToken": "./contracts/EmuToken.cdc",
-		"StakingRewards": "./contracts/StakingRewards.cdc"
-	},
-	"networks": {
-		"emulator": "127.0.0.1:3569",
-		"mainnet": "access.mainnet.nodes.onflow.org:9000",
-		"testnet": "access.devnet.nodes.onflow.org:9000"
-	},
-	"accounts": {
-		"emulator-account": {
-			"address": "f8d6e0586b0a20c7",
-			"key": "9ce611e27156c7cc590d77c99db9f7a280e26aa6fcb713e4d952a01fb3cf5a01"
-		},
-		"emulator-admin-account": {
-			"address": "01cf0e2f2f715450",
-			"keys": "bda17f3a07e924c56f66e76a38246259f17b66c5f6233fd1db4c32ba8b1702b6"
-		},
-		"emulator-user1": {
-			"address": "179b6b1cb6755e31",
-			"keys": "c3c402f4b5ac76dd16b9d60de899c01e2d3c5ae153efdd2ca7fe91ad754abd73"
-		},
-		"emulator-user2": {
-			"address": "f3fcd2c1a78f5eee",
-			"keys": "c89af7e50eb5c927e66d040a93e02a7a6ffbcd950ab9d6fcbea235f9217b4836"
-		},
-		"emulator-user3": {
-			"address": "e03daebed8ca0615",
-			"keys": "835aa2f42658d9752208e71879dff94ba6c13fdf7020c76dbb44b28c5786341e"
-		},
-		"mainnet-admin-account": {
-			"address": "01cf0e2f2f715450",
-			"keys": "bda17f3a07e924c56f66e76a38246259f17b66c5f6233fd1db4c32ba8b1702b6",
-			"chain": "testnet"
-		},
-		"testnet-admin-account": {
-			"address": "01cf0e2f2f715450",
-			"keys": "bda17f3a07e924c56f66e76a38246259f17b66c5f6233fd1db4c32ba8b1702b6",
-			"chain": "testnet"
-		}
-	},
-	"deployments": {
-		"emulator": {
-			"emulator-account": [
-				"NonFungibleToken",
-				"MetadataViews",
-				"FUSD",
-				"FungibleTokens",
-				"EmuSwap",
-				"EmuToken",
-				"xEmuToken",
-				"StakingRewards"
-			],
-			"emulator-admin-account": [],
-			"emulator-user1": [],
-			"emulator-user2": [],
-			"emulator-user3": []
-		},
-		"testnet": {
-			"testnet-admin-account": [
-				"EmuSwap",
-				"EmuToken",
-				"xEmuToken",
-				"StakingRewards"
-			]
-		},
-		"mainnet": {
-			"mainnet-admin-account": [
-				"EmuSwap",
-				"EmuToken",
-				"xEmuToken",
-				"StakingRewards"
-			]
-		}
-	}
+  "emulators": {
+    "default": {
+      "port": 3569,
+      "serviceAccount": "emulator-account"
+    }
+  },
+  "contracts": {
+    "FungibleToken": {
+      "source": "./contracts/dependencies/FungibleToken.cdc",
+      "aliases": {
+        "emulator": "0xee82856bf20e2aa6",
+        "testnet": "0x9a0766d93b6608b7",
+        "mainnet": "0xf233dcee88fe0abe"
+      }
+    },
+    "NonFungibleToken": {
+      "source": "./contracts/dependencies/NonFungibleToken.cdc",
+      "aliases": {
+        "testnet": "0x631e88ae7f1d7c20",
+        "mainnet": "0x1d7e57aa55817448"
+      }
+    },
+    "MetadataViews": {
+      "source": "./contracts/dependencies/MetadataViews.cdc",
+      "aliases": {
+        "testnet": "0x631e88ae7f1d7c20",
+        "mainnet": "0x1d7e57aa55817448"
+      }
+    },
+    "FlowToken": {
+      "source": "./contracts/dependencies/FlowToken.cdc",
+      "aliases": {
+        "emulator": "0x0ae53cb6e3f42a79",
+        "testnet": "0x7e60df042a9c0868",
+        "mainnet": "0x1654653399040a61"
+      }
+    },
+    "FUSD": {
+      "source": "./contracts/dependencies/FUSD.cdc",
+      "aliases": {
+        "testnet": "0x9a0766d93b6608b7"
+      }
+    },
+    "Test": "./contracts/Test.cdc",
+    "FungibleTokens": "./contracts/dependencies/FungibleTokens.cdc",
+    "FTAirdrop": "./contracts/FTAirdrop.cdc",
+    "EmuSwap": "./contracts/EmuSwap.cdc",
+    "xEmuToken": "./contracts/xEmuToken.cdc",
+    "EmuToken": "./contracts/EmuToken.cdc",
+    "StakingRewards": "./contracts/StakingRewards.cdc"
+  },
+  "networks": {
+    "emulator": "127.0.0.1:3569",
+    "mainnet": "access.mainnet.nodes.onflow.org:9000",
+    "testnet": "access.devnet.nodes.onflow.org:9000"
+  },
+  "accounts": {
+    "emulator-account": {
+      "address": "f8d6e0586b0a20c7",
+      "key": "9ce611e27156c7cc590d77c99db9f7a280e26aa6fcb713e4d952a01fb3cf5a01"
+    },
+    "emulator-admin-account": {
+      "address": "01cf0e2f2f715450",
+      "keys": "bda17f3a07e924c56f66e76a38246259f17b66c5f6233fd1db4c32ba8b1702b6"
+    },
+    "emulator-user1": {
+      "address": "179b6b1cb6755e31",
+      "keys": "c3c402f4b5ac76dd16b9d60de899c01e2d3c5ae153efdd2ca7fe91ad754abd73"
+    },
+    "emulator-user2": {
+      "address": "f3fcd2c1a78f5eee",
+      "keys": "c89af7e50eb5c927e66d040a93e02a7a6ffbcd950ab9d6fcbea235f9217b4836"
+    },
+    "emulator-user3": {
+      "address": "e03daebed8ca0615",
+      "keys": "835aa2f42658d9752208e71879dff94ba6c13fdf7020c76dbb44b28c5786341e"
+    },
+    "testnet-admin": {
+      "fromFile": "./flow.testnet.json"
+    },
+    "mainnet-admin": {
+      "fromFile": "./flow.mainnet.json"
+    }
+  },
+  "deployments": {
+    "emulator": {
+      "emulator-account": [
+        "NonFungibleToken",
+        "MetadataViews",
+        "FUSD",
+        "FungibleTokens",
+        "FTAirdrop",
+        "EmuToken",
+        "xEmuToken",
+        "EmuSwap",
+        "StakingRewards"
+      ],
+      "emulator-admin-account": [],
+      "emulator-user1": [],
+      "emulator-user2": [],
+      "emulator-user3": []
+    },
+    "testnet": {
+      "testnet-admin": [
+        "FungibleTokens",
+        "EmuToken",
+        "xEmuToken",
+        "EmuSwap",
+        "StakingRewards"
+      ]
+    },
+    "mainnet": {
+      "mainnet-admin": [
+        "FungibleTokens",
+        "EmuToken",
+        "xEmuToken",
+        "EmuSwap",
+        "StakingRewards"
+      ]
+    }
+  }
 }

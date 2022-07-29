@@ -1,4 +1,4 @@
-import EmuSwap from "../../contracts/exchange/EmuSwap.cdc"
+import EmuSwap from "../../contracts/EmuSwap.cdc"
 
 pub fun main(poolID: UInt64, amount: UFix64): {String:UFix64} {
     let poolRef = EmuSwap.borrowPool(id: poolID)

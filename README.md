@@ -2,6 +2,46 @@
 
 EmuSwap - Multi token swap contract.
 
+contracts/
+            EmuToken
+            xEmuToken
+            StakingRewards
+
+scripts/
+            pool
+                        get_quote_a_to_exact_b
+                        get_quote_v_to_exact_a
+                        get_quote_exact_a_to_b
+                        get_quote_exact_b_to_a
+                        get_quotes
+            staking
+                        get_farm_meta
+                        get_pending_rewards
+                        read_stakes_info
+
+            get_dao_fee_percentage
+            get_lp_fee_percentage
+            get_pool_ids
+            get_pool_meta
+            get_pools_meta
+            read_fees_collected
+
+transactions
+            EmuSwap
+                        admin
+                                        create_new_pool
+                                        toggle_pool_freeze
+                                        update_dap_fee_percentage
+                                        update_lp_fee_percentage
+                        user
+                                        add_liquidity
+                                        remove_liquidity
+                                        swap
+
+            EmuToken
+
+            Staking
+            xEmu
 - Admin can 
     - create new pool by providing inital liquidity
     - freeze/unfreeze any pool (new pools frozen by default) 

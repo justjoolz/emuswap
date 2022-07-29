@@ -12,12 +12,13 @@ func mintFlowTokens(o *overflow.Overflow, account string, amount float64) {
 		Args(o.Arguments().
 			UFix64(amount).
 			Account(account)).
-		RunPrintEventsFull()
+		RunGetEventsWithNameOrError("Minted")
+	// RunPrintEventsFull()
 }
 
 func setupFUSDVaultWithBalance(o *overflow.Overflow, account string, amount float64) {
-	o.TransactionFromFile("FUSD/setup").SignProposeAndPayAs(account).RunPrintEventsFull()
-	o.TransactionFromFile("demo/mintFUSD").SignProposeAndPayAs("account").Args(o.Arguments().UFix64(amount).Address(account)).RunPrintEventsFull()
+	o.TransactionFromFile("FUSD/setup").SignProposeAndPayAs(account).RunGetEventsWithNameOrError("") //.RunPrintEventsFull()
+	o.TransactionFromFile("demo/mintFUSD").SignProposeAndPayAs("account").Args(o.Arguments().UFix64(amount).Address(account)).RunGetEventsWithNameOrError("")
 }
 
 func createPoolFlowFUSD(o *overflow.Overflow, account string, flowAmount float64, fusdAmount float64) {
@@ -44,9 +45,9 @@ func main() {
 	mintFlowTokens(o, "user2", 1000.0)
 
 	// Setup FUSD Vaults
-	setupFUSDVaultWithBalance(o, "account", 1000.0)
-	setupFUSDVaultWithBalance(o, "user1", 1000.0)
-	setupFUSDVaultWithBalance(o, "user2", 1000.0)
+	setupFUSDVaultWithBalance(o, "account", 111111.1)
+	setupFUSDVaultWithBalance(o, "user1", 1000.1)
+	setupFUSDVaultWithBalance(o, "user2", 1000.1)
 	// EmuSwap tests
 	//
 
@@ -93,7 +94,7 @@ func main() {
 
 	// Swap
 	fmt.Print("User 1 Swaps 1.0 Flow for FUSD")
-	o.TransactionFromFile("EmuSwap/exchange/swap_flow_for_fusd").
+	o.TransactionFromFile("EmuSwap/user/swap_flow_for_fusd").
 		SignProposeAndPayAs("user1").
 		Args(o.Arguments().
 			UFix64(1.0)).
@@ -103,7 +104,7 @@ func main() {
 	o.ScriptFromFile("pool/get_quotes").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
 
 	fmt.Print("User 2 Swaps 1.0 FUSD for Flow")
-	o.TransactionFromFile("EmuSwap/exchange/swap_flow_for_fusd").
+	o.TransactionFromFile("EmuSwap/user/swap_flow_for_fusd").
 		SignProposeAndPayAs("user2").
 		Args(o.Arguments().
 			UFix64(1.0)).
@@ -113,7 +114,7 @@ func main() {
 	o.ScriptFromFile("pool/get_quotes").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
 
 	fmt.Print("User 1 Swaps 1.0 Flow for FUSD")
-	o.TransactionFromFile("EmuSwap/exchange/swap_flow_for_fusd").
+	o.TransactionFromFile("EmuSwap/user/swap_flow_for_fusd").
 		SignProposeAndPayAs("user1").
 		Args(o.Arguments().
 			UFix64(1.0)).
@@ -123,7 +124,7 @@ func main() {
 	o.ScriptFromFile("pool/get_quotes").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
 
 	fmt.Print("User 2 Swaps 1.0 FUSD for Flow")
-	o.TransactionFromFile("EmuSwap/exchange/swap_flow_for_fusd").
+	o.TransactionFromFile("EmuSwap/user/swap_flow_for_fusd").
 		SignProposeAndPayAs("user2").
 		Args(o.Arguments().
 			UFix64(1.0)).
@@ -134,27 +135,36 @@ func main() {
 
 	// Add Liquidity
 	fmt.Print("User 1 adds liquidity 200 1000")
-	o.TransactionFromFile("EmuSwap/exchange/add_liquidity_FLOW_FUSD").
+	o.TransactionFromFile("EmuSwap/user/add_liquidity").
 		SignProposeAndPayAs("user1").
 		Args(o.
 			Arguments().
+			String("flowTokenVault").
 			UFix64(200.0).
+			String("fusdVault").
 			UFix64(1000.0)).
 		RunPrintEventsFull()
 
 	fmt.Print("User 2 adds liquidity Flow/FUSD 200 1000")
-	o.TransactionFromFile("EmuSwap/exchange/add_liquidity_FLOW_FUSD").
+	o.TransactionFromFile("EmuSwap/user/add_liquidity").
 		SignProposeAndPayAs("user2").
 		Args(o.Arguments().
+			String("flowTokenVault").
 			UFix64(200.0).
+			String("fusdVault").
 			UFix64(1000.0)).
 		RunPrintEventsFull()
 
+	poolID := uint64(0)
+
 	fmt.Print("User 1 withdraws liquidity")
-	o.TransactionFromFile("EmuSwap/exchange/remove_liquidity_FLOW_FUSD").
+	o.TransactionFromFile("EmuSwap/user/remove_liquidity").
 		SignProposeAndPayAs("user1").
 		Args(o.Arguments().
-			UFix64(0.001)).
+			UInt64(poolID).
+			UFix64(0.001).
+			String("flowTokenVault").
+			String("fusdVault")).
 		RunPrintEventsFull()
 
 	o.ScriptFromFile("pool/get_quotes").Args(o.Arguments().UInt64(0).UFix64(1.0)).Run()
@@ -201,6 +211,7 @@ func main() {
 		SignProposeAndPayAs("user1").
 		Args(o.
 			Arguments().
+			UInt64(0).
 			UFix64(0.001)).
 		RunPrintEventsFull()
 
@@ -225,6 +236,7 @@ func main() {
 		SignProposeAndPayAs("user2").
 		Args(o.
 			Arguments().
+			UInt64(0).
 			UFix64(0.18999999)).
 		RunPrintEventsFull()
 
